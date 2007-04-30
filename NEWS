@@ -1,0 +1,6 @@
+Version 0.7.0: 2007-04-30
+  * based on RSvgDevice version 0.6.1 by T Jake Luciani <jakeluciani@yahoo.com>
+  * supports line types (dotted, dashed, etc.)
+  * supports one and two line tool tips
+  * supports hyperlinks on shapes
+  * fixes a potential buffer overflow problem in the C code
