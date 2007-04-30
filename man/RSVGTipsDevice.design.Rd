@@ -1,6 +1,5 @@
-\name{RSVGTipsDevice.future}
-\alias{RSVGTipsDevice.future}
-\docType{package}
+\name{RSVGTipsDevice.design}
+\alias{RSVGTipsDevice.design}
 \title{Design and future of the SVG Graphics Driver with dynamic tips}
 \description{
   The design of this driver is that it can be used with ordinary R
@@ -13,16 +12,20 @@
 \section{SVG coding style}{
   It appears that preferred SVG coding styles have changed over time.
   The defaults in this driver are those suggested at
-  http://jwatt.org/svg/authoring/.
+  \url{http://jwatt.org/svg/authoring/}.
 
   In particular:
   \itemize{
     \item The driver output by default does NOT include a DOCTYPE DTD (it is
-    recommended at http://jwatt.org/svg/authoring/ to NOT include a
+    recommended at \url{http://jwatt.org/svg/authoring/} to NOT include a
     DOCTYPE declaration.)
     \item Use shape properties directly rather than specifying them via
     style property, e.g., prefer this:
-    \code{<circle fill="red" stroke="blue" ... />} over this: \code{<circle style="fill:red; stroke:blue;" ... />}.
+    \code{<circle fill="red" stroke="blue" ... />} over this:
+    \code{<circle style="fill:red; stroke:blue;" ... />}.
+    \item Use "Namespace" aware functions, e.g.,
+    \code{getElementsByTagNameNS} instead of \code{getElementsByTagName}
+    (see also "SVG: Namespace Crash Course" in the references).
   }
 }
 \section{Limitations}{
@@ -38,12 +41,16 @@
 }
 \section{Future development possibilities}{
   \itemize{
+    \item Clean up the SVG code that defines the layout of a tool tip
+    (\code{SVG_footer()} in \code{src/devSVG.c}) - currently the vertical
+    spacing (the 'height' and 'y' attributes) is somewhat ad-hoc (coded
+    by trial and error, and may not work for all font sizes).
     \item Add font metric information to support the use of \code{\link{plotmath}}.
     \item Clean up the two-line tooltip SVG code:
     The two-line tooltip mode displays OK in the default SVG renderers in Firefox (under Windows
     2000/XP and Linux) but does not display in the Batik standalone SVG
     viewer.  It probably needs declarations to extend XML elements:
-    http://www.w3.org/TR/SVG/extend.html
+    \url{http://www.w3.org/TR/SVG/extend.html}
     23.5 Adding private elements and attributes to the DTD.
     \item Provide post-processing to use CSS (cascading style sheets) to make SVG files with
     lots of elements more compact.
@@ -52,9 +59,12 @@
 \references{
   www Consortum
   \emph{W3C Scalable Vector Graphics (SVG)}
-  http://www.w3.org/Graphics/SVG/Overview.htm8
+  \url{http://www.w3.org/Graphics/SVG/Overview.htm8}
   
-  SVG authoring guidelines http://jwatt.org/svg/authoring
+  SVG authoring guidelines \url{http://jwatt.org/svg/authoring}
+
+  SVG: Namespaces Crash Course
+  \url{http://developer.mozilla.org/en/docs/SVG\_Namespace\_Tips\_(external)}
 
   "SVG Essentials", J. David Eisenberg, O'Reilly and Associates, 2002.
 }
@@ -64,4 +74,4 @@
   \code{\link{pictex}}, \code{\link{postscript}}, \code{\link{Devices}}.
   
 }
-\keyword{ package }
+\keyword{device}

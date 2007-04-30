@@ -30,7 +30,7 @@
   \email{jakeluciani@yahoo.com}
 }
 \seealso{
-  \link[=RSVGTipsDevice.future]{Design and future possible features} of the RSVGTips device.
+  \link[=RSVGTipsDevice.design]{Design and future possible features} of the RSVGTips device.
 
   \code{\link{pictex}}, \code{\link{postscript}}, \code{\link{Devices}}.
   

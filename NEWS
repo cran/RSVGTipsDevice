@@ -1,3 +1,6 @@
+Version 0.7.1: 2007-06-12
+  * small change to SVG code to make it display tips in more browsers
+  * added options to control font size and opacity in tips
 Version 0.7.0: 2007-04-30
   * based on RSvgDevice version 0.6.1 by T Jake Luciani <jakeluciani@yahoo.com>
   * supports line types (dotted, dashed, etc.)

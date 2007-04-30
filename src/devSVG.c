@@ -67,6 +67,8 @@ typedef struct {
     int bg;
     int fontsize;
     int fontface;
+    int tipFontSize;
+    double tipOpacity;
     Rboolean debug;
     Rboolean xmlHeader;
     Rboolean useStyleAttributes; /* if 1, use style="stroke: black" etc, if 0 use stroke="black" etc */
@@ -239,14 +241,14 @@ static char* toolTip1Header[] = {
     "       var targetElement = evt.target;",
     "       if ( lastElement != targetElement )",
     "       {",
-    "          var targetTitle = targetElement.getElementsByTagNameNS(null, 'title').item(0);",
+    "          var targetTitle = targetElement.getElementsByTagNameNS(svgns, 'title').item(0);",
     "          if ( targetTitle )",
     "          {",
     "             // if there is a 'title' element, use its contents for the tooltip title",
     "             titleValue = targetTitle.firstChild.nodeValue;",
     "          }",
     "",
-    "          var targetDesc = targetElement.getElementsByTagNameNS(null, 'desc').item(0);",
+    "          var targetDesc = targetElement.getElementsByTagNameNS(svgns, 'desc').item(0);",
     "          if ( targetDesc )",
     "          {",
     "             // if there is a 'desc' element, use its contents for the tooltip desc",
@@ -305,17 +307,6 @@ static char* toolTip1Header[] = {
     "    };",
     "",
     "   ]]></script>",
-    "!END!"
-};
-
-static char* toolTip1Footer[] = {
-    "<g id='ToolTip' opacity='0.8' visibility='hidden' pointer-events='none'>",
-    "    <rect id='tipbox' x='0' y='5' width='88' height='20' rx='2' ry='2' fill='white' stroke='black'/>",
-    "    <text id='tipText' x='5' y='20' font-family='Arial' font-size='12pt' fill='blue'>",
-    "       <tspan id='tipTitle' x='5' font-weight='bold' fill='black'><![CDATA[]]></tspan>",
-    "       <tspan id='tipDesc' x='5' dy='15'><![CDATA[]]></tspan>",
-    "    </text>",
-    "</g>",
     "!END!"
 };
 
@@ -399,14 +390,14 @@ static char* toolTip2Header[] = {
     "      var targetElement = evt.target;",
     "      if ( lastElement != targetElement )",
     "      {",
-    "	 var targetTitle = targetElement.getElementsByTagNameNS(null, 'title').item(0);",
+    "	 var targetTitle = targetElement.getElementsByTagNameNS(svgns, 'title').item(0);",
     "	 if ( targetTitle )",
     "	 {",
     "	    // if there is a 'title' element, use its contents for the tooltip title",
     "	    titleValue = targetTitle.firstChild.nodeValue;",
     "	 }",
     "",
-    "	 var targetDesc1 = targetElement.getElementsByTagNameNS(null, 'desc1').item(0);",
+    "	 var targetDesc1 = targetElement.getElementsByTagNameNS(svgns, 'desc1').item(0);",
     "	 if ( targetDesc1 )",
     "	 {",
     "	    // if there is a 'desc1' element, use its contents for the tooltip desc1",
@@ -419,7 +410,7 @@ static char* toolTip2Header[] = {
     "	       desc1Value = '';",
     "	    }",
     "	 }",
-    "	 var targetDesc2 = targetElement.getElementsByTagNameNS(null, 'desc2').item(0);",
+    "	 var targetDesc2 = targetElement.getElementsByTagNameNS(svgns, 'desc2').item(0);",
     "	 if ( targetDesc2 )",
     "	 {",
     "	    // if there is a 'desc2' element, use its contents for the tooltip desc",
@@ -478,18 +469,6 @@ static char* toolTip2Header[] = {
     "   };",
     "",
     "]]></script>",
-    "!END!"
-};
-
-static char* toolTip2Footer[] = {
-    "<g id='ToolTip' opacity='0.8' visibility='hidden' pointer-events='none'>",
-    "   <rect id='tipbox' x='0' y='5' width='88' height='20' rx='2' ry='2' fill='white' stroke='black'/>",
-    "   <text id='tipText' x='5' y='20' font-family='Arial' font-size='12pt' fill='blue'>",
-    "      <tspan id='tipTitle' x='5' font-weight='bold' fill='black'><![CDATA[]]></tspan>",
-    "      <tspan id='tipDesc1' x='5' dy='15'><![CDATA[]]></tspan>",
-    "      <tspan id='tipDesc2' x='5' dy='15'><![CDATA[]]></tspan>",
-    "   </text>",
-    "</g>",
     "!END!"
 };
 
@@ -830,16 +809,29 @@ static void SVG_header(SVGDesc *ptd)
     ptd->pageno++;
 }
 
-
 static void SVG_footer(SVGDesc *ptd)
 {
     int i;
-    if (ptd->toolTipMode==1)
-	for (i=0; strcmp("!END!", toolTip1Footer[i]); i++)
-	    fprintf(ptd->texfp, "%s\n", toolTip1Footer[i]);
-    else if (ptd->toolTipMode==2)
-	for (i=0; strcmp("!END!", toolTip2Footer[i]); i++)
-	    fprintf(ptd->texfp, "%s\n", toolTip2Footer[i]);
+    if (ptd->toolTipMode>0) {
+	fprintf(ptd->texfp, "<g id='ToolTip' opacity='%g' visibility='hidden' pointer-events='none'>\n",
+		ptd->tipOpacity);
+	fprintf(ptd->texfp, "   <rect id='tipbox' x='0' y='5' width='88' height='%d' rx='2' ry='2' fill='white' stroke='black'/>\n",
+		2 * ptd->tipFontSize);
+	fprintf(ptd->texfp, "   <text id='tipText' x='5' y='%d' font-family='Arial' font-size='%dpt' fill='blue'>\n",
+		2 * ptd->tipFontSize, ptd->tipFontSize);
+	fprintf(ptd->texfp, "      <tspan id='tipTitle' x='5' font-weight='bold' fill='black'><![CDATA[]]></tspan>\n");
+	if (ptd->toolTipMode==1) {
+	    fprintf(ptd->texfp, "      <tspan id='tipDesc' x='5' dy='%d'><![CDATA[]]></tspan>\n",
+		    (int) ((1.3 * ptd->tipFontSize) + 0.5));
+	} else {
+	    fprintf(ptd->texfp, "      <tspan id='tipDesc1' x='5' dy='%d'><![CDATA[]]></tspan>\n",
+		    (int) ((1.3 * ptd->tipFontSize) + 0.5));
+	    fprintf(ptd->texfp, "      <tspan id='tipDesc2' x='5' dy='%d'><![CDATA[]]></tspan>\n",
+		    (int) ((1.3 * ptd->tipFontSize) + 0.5));
+	}
+	fprintf(ptd->texfp, "   </text>\n");
+	fprintf(ptd->texfp, "</g>\n");
+    }
     fprintf(ptd->texfp, "</svg>\n");
 }
 
@@ -1161,6 +1153,7 @@ static void SVG_Hold(NewDevDesc *dd)
 Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
                          double width, double height, Rboolean debug,
                          Rboolean xmlHeader, char *title, int toolTipMode,
+			 int tipFontSize, double tipOpacity,
 			 Rboolean onefile, Rboolean useStyleAttributes)
 {
     SVGDesc *ptd;
@@ -1181,6 +1174,7 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     ptd->filename = Calloc(strlen(filename)+1, char);
     strcpy(ptd->filename, filename);
 
+    /* change to R_GE_str2col() for R-2.6.0 */
     dd->startfill = Rf_str2col(bg);
     dd->startcol = Rf_str2col(fg);
     dd->startps = 10;
@@ -1220,6 +1214,8 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     ptd->xmlHeader = xmlHeader;
     ptd->useStyleAttributes = useStyleAttributes;
     ptd->onefile   = onefile;
+    ptd->tipFontSize = tipFontSize;
+    ptd->tipOpacity = tipOpacity;
 
     if ( ! SVG_Open(dd, ptd) )
         return FALSE;
@@ -1263,6 +1259,7 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
 static  GEDevDesc *RSvgDevice(char **file, char **bg, char **fg,
                               double *width, double *height, int *debug,
                               int *xmlHeader, char **title, int *toolTipMode,
+			      int *tipFontSize, double *tipOpacity,
 			      int *onefile, int *useStyleAttributes)
 {
     GEDevDesc *dd;
@@ -1278,7 +1275,8 @@ static  GEDevDesc *RSvgDevice(char **file, char **bg, char **fg,
         dev->displayList = R_NilValue;
 
         if (!SVGDeviceDriver(dev, file[0], bg[0], fg[0], width[0], height[0], debug[0],
-			    xmlHeader[0], title[0], toolTipMode[0], onefile[0], useStyleAttributes[0])) {
+			     xmlHeader[0], title[0], toolTipMode[0], tipFontSize[0],
+			     tipOpacity[0], onefile[0], useStyleAttributes[0])) {
             Free(dev);
             error("unable to start device SVG");
         }
@@ -1294,13 +1292,16 @@ static  GEDevDesc *RSvgDevice(char **file, char **bg, char **fg,
 }
 
 void do_SVG(char **file, char **bg, char **fg, double *width, double *height,
-            int *debug, int *xmlHeader, char **title, int *toolTipMode, int *onefile, int *useStyleAttributes)
+            int *debug, int *xmlHeader, char **title, int *toolTipMode,
+	    int *tipFontSize, double *tipOpacity,
+	    int *onefile, int *useStyleAttributes)
 {
     char *vmax;
 
     vmax = vmaxget();
 
-    RSvgDevice(file, bg, fg, width, height, debug, xmlHeader, title, toolTipMode, onefile, useStyleAttributes);
+    RSvgDevice(file, bg, fg, width, height, debug, xmlHeader, title, toolTipMode,
+	       tipFontSize, tipOpacity, onefile, useStyleAttributes);
 
     vmaxset(vmax);
 }

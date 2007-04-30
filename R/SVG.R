@@ -1,13 +1,15 @@
 devSVGTips <- function (file = "Rplots.svg", width = 10, height = 8,
-                         bg = "white", fg = "black", onefile = TRUE,
-                         xmlHeader = FALSE, useStyleAttributes=FALSE,
-                         toolTipMode=1, title="R SVG Plot")
+                        bg = "white", fg = "black", onefile = TRUE,
+                        xmlHeader = FALSE, useStyleAttributes=FALSE,
+                        toolTipMode=1, toolTipFontSize=10, toolTipOpacity=1.0,
+                        title="R SVG Plot")
 {
     dev <- .C("do_SVG", as.character(file),
               as.character(bg), as.character(fg),
               as.double(width), as.double(height),
               as.logical(FALSE), as.logical(xmlHeader),
               as.character(title), as.integer(toolTipMode),
+              as.integer(toolTipFontSize), as.double(toolTipOpacity),
               as.logical(onefile), as.logical(useStyleAttributes),
               PACKAGE="RSVGTipsDevice")
 

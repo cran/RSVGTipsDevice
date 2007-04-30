@@ -5,7 +5,8 @@
 devSVGTips(file = "Rplots.svg", width = 10, height = 8,
        bg = "white", fg = "black", onefile=TRUE,
        xmlHeader=FALSE, useStyleAttributes=FALSE,
-       toolTipMode = 1, title = "R SVG Plot")
+       toolTipMode = 1, toolTipFontSize = 10,
+       toolTipOpacity = 1.0, title = "R SVG Plot")
 }
 \arguments{
   \item{file}{the file where output will appear.}
@@ -18,6 +19,10 @@ devSVGTips(file = "Rplots.svg", width = 10, height = 8,
   \item{useStyleAttributes}{Specify shape attributes in a
     \code{style} attribute or as plain attributes (plain attributes is recommended)}
   \item{toolTipMode}{Mode of toop tips: 0 (no tool tips), 1, or 2 (number of lines of tool tip).}
+  \item{toolTipFontSize}{Size of font in tool tips (in points/pixels)}
+  \item{toolTipOpacity}{Opacity of toop tips: between 0 and 1.  A value
+    of 0.9 allows the image behind the tooltip to be seen, but can
+    render slowly on some viewers.}
   \item{title}{Title of plot.}
 }
 \description{
@@ -35,7 +40,8 @@ devSVGTips(file = "Rplots.svg", width = 10, height = 8,
   commands to the file.
 }
 \seealso{
-  \link[=RSVGTipsDevice.future]{Design and future} of the RSVGTips device.
+  \link[=SVG.viewing]{SVG viewing} Ways to view SVG files.
+  \link[=RSVGTipsDevice.design]{Design and future} of the RSVGTips device.
   \link[=RSVGTipsDevice]{Overview} of the RSVGTips device (many more examples).
   \code{\link{setSVGShapeToolTip}}, \code{\link{setSVGShapeURL}}, \code{\link{getSVGToolTipMode}}, \code{\link{pictex}}, \code{\link{postscript}}, \code{\link{Devices}}.
 }
@@ -54,5 +60,27 @@ points(2:8, 8:2, cex=3, pch=19, col='black')
 # tooltips on each these points
 invisible(sapply(1:7, function(x) {setSVGShapeToolTip(title=paste("point", x)); points(x+1, 8-x, cex=3, pch=1, col='black')}))
 dev.off()
+
+\dontrun{
+# Not run in tests because uses the SemiPar package for the fuel.frame data
+# A plot of fuel mileage vs weight
+library("RSVGTipsDevice")
+library("SemiPar")
+data(fuel.frame)
+fuel.frame <- cbind(fuel.frame,
+    US=is.element(substring(fuel.frame$car.name, 1, 5),
+                  c("Buick", "Chevr", "Chrys", "Dodge", "Eagle",
+                    "Ford ", "Mercu", "Oldsm", "Plymo", "Ponti")))
+devSVGTips("mlgvswgt1.svg", height=5, width=7, toolTipMode=1, title="Mileage vs Weight for autos, tooltips are title + 1 line")
+plot(fuel.frame$Weight, fuel.frame$Mileage, type="n", xlab="Weight",
+ylab="Miles per gallon", main="US cars in blue, imports in yellow")
+for (i in seq(len=nrow(fuel.frame))) {
+    setSVGShapeToolTip(title=fuel.frame[i,"car.name"],
+        desc=paste(fuel.frame[i, "Type"], ", disp=", fuel.frame[i,"Disp."]))
+    points(fuel.frame[i,"Weight"], fuel.frame[i,"Mileage"], pch=19,
+        cex=2, col=if (fuel.frame[i,"US"]) "blue" else "yellow")
+}
+dev.off()
+}
 }
 \keyword{device}
