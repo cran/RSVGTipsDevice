@@ -11,12 +11,17 @@ setSVGShapeURL(url)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{url}{ A full URL, e.g., \code{"http://www.r-project.org"}}
+  \item{url}{ A full valid URL, e.g., \code{"http://www.r-project.org"}}
 }
 \details{
   This function sets a hyperlink that will be included in the SVG commands
   output for the next
   graphics shape drawn with \code{\link{RSVGTipsDevice}}.
+
+  Note that the URL is used as-is, with no substitutions made for
+  special characters.  Consequently, it is possible to produce an
+  invalid XML file by supplying a URL with special characters (i.e.,
+  "<", ">", "&", and single- and double-quotes.)
 }
 \value{
   Returns an invisible NULL.

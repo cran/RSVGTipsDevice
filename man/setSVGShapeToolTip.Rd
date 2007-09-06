@@ -6,7 +6,8 @@
   Set the tool tip for the next graphics shape drawn with the RSVGTips device.
 }
 \usage{
-setSVGShapeToolTip(title = NULL, desc = NULL, desc1 = desc, desc2 = NULL)
+setSVGShapeToolTip(title = NULL, desc = NULL, desc1 = desc, desc2 =
+NULL, sub.special=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -14,7 +15,9 @@ setSVGShapeToolTip(title = NULL, desc = NULL, desc1 = desc, desc2 = NULL)
   \item{desc}{ The text of the tool tip. }
   \item{desc1}{ The first line of text of the tool tip. }
   \item{desc2}{ The second line of text of the tool tip (used when
-  the tool tip mode is 2.) }
+    the tool tip mode is 2.) }
+  \item{sub.special}{ If \code{FALSE}, do NOT replace special characters
+    by their XML encodings (see details).}
 }
 \details{
   This function sets tool tip text that will be used by the next
@@ -25,6 +28,21 @@ setSVGShapeToolTip(title = NULL, desc = NULL, desc1 = desc, desc2 = NULL)
   etc.  If multiple objects are drawn (e.g., by supplying a vector to
   \code{points}), only the first shape drawn will have a tooltip.  Note
   that \code{lines} does NOT use a tooltip.
+
+  Unless \code{sub.special=FALSE}, the following special characters in
+  \code{title}, \code{desc}, etc. will
+  be substituted by the XML entity as shown:
+  \tabular{rl}{
+  \code{\&} \tab \&amp; \cr
+  \code{\'} \tab \&apos; \cr
+  \code{\"} \tab \&quot; \cr
+  \code{\<} \tab \&lt; \cr
+  \code{\>} \tab \&gt;
+  }
+% Note that it was very hard to get all the quoting right in the above table
+% so that it could be processed correctly - merely escaping the special
+% characters in the first column was no sufficient - had to enclose them
+% in \code{} too.
 }
 \value{
   Returns an invisible NULL.

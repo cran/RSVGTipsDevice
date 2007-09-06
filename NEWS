@@ -1,3 +1,8 @@
+Version 0.7.2: 2007-09-06
+  * Replace special characters <>&'" by their XML entity (&lt; etc.)
+    in setSVGShapeToolTip() (and add extra arg sub.special=TRUE to
+    this function to allow inhibiting this substitution).  Do the
+    same for the label in text().
 Version 0.7.1: 2007-06-12
   * small change to SVG code to make it display tips in more browsers
   * added options to control font size and opacity in tips

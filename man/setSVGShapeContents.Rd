@@ -18,6 +18,13 @@ setSVGShapeContents(contents)
   This function sets text that will be included in the SVG commands
   output for the next
   graphics shape drawn with \code{\link{RSVGTipsDevice}}.
+  
+  Note that \code{contents} is used as-is, with no substitutions made for
+  special characters.  Consequently, it is possible to produce an
+  invalid XML file by using special characters in contents (i.e.,
+  "<", ">", "&", and single- and double-quotes.)  Such special
+  characters should be replaced by their XML equivalent entity -- see
+  \code{\link{setSVGShapeToolTip}} for a list of these.
 }
 \value{
   Returns an invisible NULL.

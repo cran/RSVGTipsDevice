@@ -147,6 +147,30 @@ for (i in 0:16) {
 }
 dev.off()
 
+# This example checks encoding of characters that are special in XML: <&'">
+# To avoid tripping up people who have already used the XML entity
+# (e.g., "&amp"), an ampersand followed by lower-case letters and a
+# semicolon is NOT encoded.
+devSVGTips("svgplot10.svg", toolTipMode=1,
+    title="SVG example plot 1: shapes and points, tooltips are title + 1 line, special chars")
+plot(c(0,10),c(0,10), type="n", xlab="x", ylab="y",
+    main="Example SVG plot with title + 1 line tips <mode=1>")
+setSVGShapeToolTip(title="A rectangle", desc="that is <yellow> &amp; yellow")
+rect(1,1,4,6, col='yellow')
+setSVGShapeToolTip(title="1st circle with title only")
+points(5.5,7.5,cex=20,pch=19,col='red')
+setSVGShapeToolTip(title="A triangle", desc="big & green")
+polygon(c(3,6,8), c(3,6,3), col='green')
+text(lab="Special chars: <&'\">", 6, 9, adj=0, cex=1.3)
+text(lab="Already encoded: &lt;&amp;&gt;", 6, 9.5, adj=0, cex=1.3)
+# no tooltips on these points
+points(2:8, 8:2, cex=3, pch=19, col='black')
+# tooltips on each these points
+invisible(sapply(1:7, function(x)
+{setSVGShapeToolTip(title=paste("<point ", x, ">", sep=""))
+ points(x+1, 8-x, cex=3, pch=1, col='black')}))
+dev.off()
+
 }
 \keyword{device}
 \keyword{package}

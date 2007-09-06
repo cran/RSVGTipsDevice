@@ -6,24 +6,28 @@ devSVGTips(file = "Rplots.svg", width = 10, height = 8,
        bg = "white", fg = "black", onefile=TRUE,
        xmlHeader=FALSE, useStyleAttributes=FALSE,
        toolTipMode = 1, toolTipFontSize = 10,
-       toolTipOpacity = 1.0, title = "R SVG Plot")
+       toolTipOpacity = 1.0, title = "R SVG Plot", sub.special=TRUE)
 }
 \arguments{
-  \item{file}{the file where output will appear.}
-  \item{width}{The width of the plot in inches.}
-  \item{height}{the height of the plot in inches.}
-  \item{bg}{the background color for the plot.}
-  \item{fg}{the foreground color for the plot.}
-  \item{onefile}{merge plot calls into onefile or separate them to separate pages.}
+  \item{file}{the file where output will appear}
+  \item{width}{The width of the plot in inches}
+  \item{height}{the height of the plot in inches}
+  \item{bg}{the background color for the plot}
+  \item{fg}{the foreground color for the plot}
+  \item{onefile}{merge plot calls into onefile or separate them to separate pages}
   \item{xmlHeader}{Print XML header or not (it is recommended to not print a header)}
   \item{useStyleAttributes}{Specify shape attributes in a
     \code{style} attribute or as plain attributes (plain attributes is recommended)}
-  \item{toolTipMode}{Mode of toop tips: 0 (no tool tips), 1, or 2 (number of lines of tool tip).}
+  \item{toolTipMode}{Mode of toop tips: 0 (no tool tips), 1, or 2 (number of lines of tool tip)}
   \item{toolTipFontSize}{Size of font in tool tips (in points/pixels)}
   \item{toolTipOpacity}{Opacity of toop tips: between 0 and 1.  A value
     of 0.9 allows the image behind the tooltip to be seen, but can
-    render slowly on some viewers.}
-  \item{title}{Title of plot.}
+    render slowly on some viewers}
+  \item{title}{Title of plot}
+  \item{sub.special}{Unless \code{sub.special=FALSE}, special SVG
+    characters (ampersand, less-than, etc.) in \code{title} will be substituted by the
+    appropriate XML encoding (if these substitutions are not made, it is easy to
+    inadvertently create unusable SVG files)}
 }
 \description{
   This function starts up an SVG graphics device that will write to a

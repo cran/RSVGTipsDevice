@@ -2,13 +2,14 @@ devSVGTips <- function (file = "Rplots.svg", width = 10, height = 8,
                         bg = "white", fg = "black", onefile = TRUE,
                         xmlHeader = FALSE, useStyleAttributes=FALSE,
                         toolTipMode=1, toolTipFontSize=10, toolTipOpacity=1.0,
-                        title="R SVG Plot")
+                        title="R SVG Plot", sub.special=TRUE)
 {
     dev <- .C("do_SVG", as.character(file),
               as.character(bg), as.character(fg),
               as.double(width), as.double(height),
               as.logical(FALSE), as.logical(xmlHeader),
-              as.character(title), as.integer(toolTipMode),
+              as.character(encodeSVGSpecialChars(as.character(title), sub.special)),
+              as.integer(toolTipMode),
               as.integer(toolTipFontSize), as.double(toolTipOpacity),
               as.logical(onefile), as.logical(useStyleAttributes),
               PACKAGE="RSVGTipsDevice")
@@ -30,27 +31,42 @@ setSVGShapeURL <- function(url)
     invisible(NULL)
 }
 
-setSVGShapeToolTip <- function(title=NULL, desc=NULL, desc1=desc, desc2=NULL) {
+setSVGShapeToolTip <- function(title=NULL, desc=NULL, desc1=desc, desc2=NULL, sub.special=TRUE) {
     if (names(dev.cur()) != "devSVG")
         return(invisible(NULL))
     contents <- character(0)
     toolTipMode <- getSVGToolTipMode()
     if (toolTipMode>0) {
         if (!is.null(title))
-            contents <- c(contents, paste("<title>", title, "</title>", sep=""))
+            contents <- c(contents, paste("<title>", encodeSVGSpecialChars(title), "</title>", sep=""))
         if (toolTipMode==1) {
             if (!is.null(desc1))
-                contents <- c(contents, paste("<desc>", desc1, "</desc>", sep=""))
+                contents <- c(contents, paste("<desc>", encodeSVGSpecialChars(desc1), "</desc>", sep=""))
         } else {
             if (!is.null(desc1))
-                contents <- c(contents, paste("<desc1>", desc1, "</desc1>", sep=""))
+                contents <- c(contents, paste("<desc1>", encodeSVGSpecialChars(desc1), "</desc1>", sep=""))
             if (!is.null(desc2))
-                contents <- c(contents, paste("<desc2>", desc2, "</desc2>", sep=""))
+                contents <- c(contents, paste("<desc2>", encodeSVGSpecialChars(desc2), "</desc2>", sep=""))
         }
-        if (length(contents))
-        .C("SetSvgShapeContents", as.character(paste(contents, collapse="\n")), PACKAGE="RSVGTipsDevice")
+        if (length(contents)) {
+            .C("SetSvgShapeContents", as.character(paste(contents, collapse="\n")), PACKAGE="RSVGTipsDevice")
+        }
     }
     invisible(NULL)
+}
+
+encodeSVGSpecialChars <- function(x, sub.special=TRUE) {
+    if (!sub.special)
+        return(x)
+    if (regexpr("[<>&'\"]", x) > 0) {
+        # use a negative look-ahead assertion to avoid replaceing the "&" in an XML entity
+        x <- gsub("&(?![a-z]+;)", "&amp;", x, perl=TRUE)
+        x <- gsub("<", "&lt;", x, fixed=TRUE)
+        x <- gsub(">", "&gt;", x, fixed=TRUE)
+        x <- gsub("'", "&apos;", x, fixed=TRUE)
+        x <- gsub("\"", "&quot;", x, fixed=TRUE)
+    }
+    x
 }
 
 getSVGToolTipMode <- function()

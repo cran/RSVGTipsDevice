@@ -1086,11 +1086,31 @@ static void SVG_Polygon(int n, double *x, double *y,
 
 static void textext(char *str, SVGDesc *ptd)
 {
-
+    char *c;
     for( ; *str ; str++)
         switch(*str) {
-
-
+	case '&':
+	    /* check if we have the pattern "&[a-z]+;" which would already be an XML entity */
+	    c = str+1;
+	    while (*c && islower(*c))
+		c++;
+	    if (*c == ';')
+		fputc(*str, ptd->texfp);
+	    else
+		fputs("&amp;", ptd->texfp);
+	    break;
+	case '<':
+	    fputs("&lt;", ptd->texfp);
+	    break;
+	case '>':
+	    fputs("&gt;", ptd->texfp);
+	    break;
+	case '\'':
+	    fputs("&apos;", ptd->texfp);
+	    break;
+	case '"':
+	    fputs("&quot;", ptd->texfp);
+	    break;
         default:
             fputc(*str, ptd->texfp);
             break;
@@ -1174,7 +1194,7 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     ptd->filename = Calloc(strlen(filename)+1, char);
     strcpy(ptd->filename, filename);
 
-    /* change to R_GE_str2col() for R-2.6.0 */
+    /* change to R_GE_str2col() for R-2.6.0 - wait a while until after R-2.6.0 is released */
     dd->startfill = Rf_str2col(bg);
     dd->startcol = Rf_str2col(fg);
     dd->startps = 10;
