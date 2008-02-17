@@ -26,7 +26,8 @@ devSVGTips(file = "Rplots.svg", width = 10, height = 8,
   \item{title}{Title of plot}
   \item{sub.special}{Unless \code{sub.special=FALSE}, special SVG
     characters (ampersand, less-than, etc.) in \code{title} will be substituted by the
-    appropriate XML encoding (if these substitutions are not made, it is easy to
+    appropriate XML encoding, except for an ampersand followed by
+    lower-case letters and then a semi-colon (if these substitutions are not made, it is easy to
     inadvertently create unusable SVG files)}
 }
 \description{
@@ -42,6 +43,30 @@ devSVGTips(file = "Rplots.svg", width = 10, height = 8,
   After the plot is completed, the function \code{\link{dev.off}} must
   be called to close the graphics device and flush all unwritten SVG
   commands to the file.
+
+  Text drawn on the graphic by commands like \code{text()} is subject to
+  XML special characters being replaced by the corresponding XML encoding,
+  except for an ampersand followed by
+  lower-case letters and then a semi-colon.  This behavior is NOT
+  controlled by \code{sub.special} and there is currently no way to
+  turn it off.
+
+  This device is not implemented as one that can do clipping.  Thus, R
+  commands like \code{text} will not draw the text if part of the text
+  might be outside the plotting region.  This can be the cause of
+  \code{legend} (or other functions that call \code{text}) omitting
+  text.  The solution is to make sure that the text is drawn inside the
+  plotting region, e.g., using commands like \code{legend(...,
+    inset=0.01)}.
+  If text is not appearing, use \code{par(xpd=NA)}, which will do the
+  least clipping of text.  The example plot svgplot13.svg in
+  \link{RSVGTipsDevice} shows clipping that happens for various settings
+  of \code{par("xpd")}.
+
+  The clipping behavior can result in labels unexpectedly not appearing
+  in lattice graphics.  This can sometime be solved by making the region
+  in which labels are drawn larger, e.g., by doing something like
+  \code{xyplot(strip.par.text=list(lines=2), ...)}.
 }
 \seealso{
   \link[=SVG.viewing]{SVG viewing} Ways to view SVG files.

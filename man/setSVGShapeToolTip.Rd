@@ -38,11 +38,14 @@ NULL, sub.special=TRUE)
   \code{\"} \tab \&quot; \cr
   \code{\<} \tab \&lt; \cr
   \code{\>} \tab \&gt;
-  }
+}
 % Note that it was very hard to get all the quoting right in the above table
 % so that it could be processed correctly - merely escaping the special
 % characters in the first column was no sufficient - had to enclose them
 % in \code{} too.
+  The exception to this is that an ampersand followed by lower-case
+  letters and then a semi-colon is always left alone, because it already
+  looks like an XML entity.
 }
 \value{
   Returns an invisible NULL.

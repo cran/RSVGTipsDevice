@@ -6,21 +6,24 @@
   Encode SVG special chars (ampersand, etc) as the appropriate XML encoding.
 }
 \usage{
-encodeSVGSpecialChars(x, sub.special = TRUE)
+encodeSVGSpecialChars(x, sub.special = TRUE, xent = FALSE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{x}{ A vector of character data to be encode. }
   \item{sub.special}{ If \code{FALSE}, do not encode. }
+  \item{xent}{ If \code{FALSE}, encode as XML encoding, if \code{TRUE},
+    encode as XML entity}
 }
 \details{
   The following substitutions are made:
-  \tabular{rl}{
-  \code{\&} \tab \&amp; \cr
-  \code{\'} \tab \&apos; \cr
-  \code{\"} \tab \&quot; \cr
-  \code{\<} \tab \&lt; \cr
-  \code{\>} \tab \&gt;
+  \tabular{rll}{
+    Character \tab XML encoding \tab XML entity \cr
+  \code{\&} \tab \&amp; \tab \&\#38 \cr
+  \code{\'} \tab \&apos; \tab \&\#30 \cr
+  \code{\"} \tab \&quot; \tab \&\#34 \cr
+  \code{\<} \tab \&lt; \tab \&\#60 \cr
+  \code{\>} \tab \&gt; \tab \&\#62 
   }
 
 }

@@ -7,21 +7,23 @@
   with the RSVGTips device.
 }
 \usage{
-setSVGShapeURL(url)
+setSVGShapeURL(url, target=NULL, sub.special=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{url}{ A full valid URL, e.g., \code{"http://www.r-project.org"}}
+  \item{target}{ The name of a target in the page - use "\_blank" to make
+    the link open a new browser tab or window}
+  \item{sub.special}{ If \code{TRUE}, substitue XML encodings for
+    special characters in \code{url} and \code{target}.  If
+    \code{FALSE}, it is possible to produce an
+  invalid XML file by supplying a URL with special characters (i.e.,
+  "<", ">", "&", and single- and double-quotes.)}
 }
 \details{
   This function sets a hyperlink that will be included in the SVG commands
   output for the next
   graphics shape drawn with \code{\link{RSVGTipsDevice}}.
-
-  Note that the URL is used as-is, with no substitutions made for
-  special characters.  Consequently, it is possible to produce an
-  invalid XML file by supplying a URL with special characters (i.e.,
-  "<", ">", "&", and single- and double-quotes.)
 }
 \value{
   Returns an invisible NULL.

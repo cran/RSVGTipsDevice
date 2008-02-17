@@ -1,0 +1,39 @@
+X11()
+par(mar=c(0,0,0,0))
+textinbox <- function(x, y, i) {
+  lab <- paste(rep(rawToChar(as.raw(i)),10),collapse="")
+  text(x, y, lab=lab, adj=c(0)) # behaves like adj=c(0,0.5)
+  w <- strwidth(lab)
+  rect(x, y-strheight(lab)/2, x+w, y+strheight(lab)/2)
+}
+plot(y=c(0,25),x=c(0,4), type="n", axes=F, xlab="", ylab="")
+print(par("adj"))
+xwid <- strwidth(rawToChar(as.raw(0:127), multiple=TRUE))
+for (i in 32:127) textinbox(x=0.1+(i-32)%/%24, y=24-(i-32)%%24, i)
+dev.off()
+
+devSVGTips("svgplot11.svg", toolTipMode=0, title="SVG example plot 11: text width with cex=1")
+par(mar=c(0,0,0,0))
+charbysize0 <- "'ijlIJ,./\\|:;f !\"()[]rt-*?FLTYcksxyzv`_$0123456789EKPRXabdeghnopqu{}\177wABCSVDGHNOQUZ#&+<=>MW^~%@m"
+allchars    <- " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\177"
+charbysize <- paste(c(charbysize0, setdiff(strsplit(allchars, NULL)[[1]], strsplit(charbysize0, NULL)[[1]])), collapse="")
+charwid <- c("'"=18, ","=25, " "=30, "*"=42, "$"=47, "w"=53, "D"=59, "#"=65, "%"=71, "@"=77)/1000
+textinbox <- function(x, y, i) {
+  cc <- substring(charbysize, i-31, i-31)
+  lab <- paste(rep(cc,10), collapse="")
+  text(x, y, lab=lab, adj=0)
+  w <- NA
+  for (j in (i-31):1)
+    if (is.element(substring(charbysize, j, j), names(charwid))) {
+      w <- charwid[substring(charbysize, j, j)]
+      break
+    }
+  if (is.na(w))
+    w <- 0.01
+  w <- 10 * w
+  rect(x, y-strheight(lab)/2, x+w, y+strheight(lab)/2)
+}
+strwidth(c("i","A","M","m"))
+plot(y=c(0,25),x=c(0,4), type="n", axes=F, xlab="", ylab="")
+for (i in 32:127) textinbox(x=0.1+(i-32)%/%24, y=24-(i-32)%%24, i)
+dev.off()

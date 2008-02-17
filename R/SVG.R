@@ -24,10 +24,13 @@ setSVGShapeContents <- function(contents)
     invisible(NULL)
 }
 
-setSVGShapeURL <- function(url)
+setSVGShapeURL <- function(url, target=NULL, sub.special=TRUE)
 {
-    if (names(dev.cur()) == "devSVG")
-        .C("SetSvgShapeURL", as.character(url), PACKAGE="RSVGTipsDevice")
+    if (names(dev.cur()) == "devSVG") {
+        .C("SetSvgShapeURL", encodeSVGSpecialChars(as.character(url), sub.special=sub.special, xent=TRUE), PACKAGE="RSVGTipsDevice")
+        if (!is.null(target))
+            .C("SetSvgShapeURLTarget", encodeSVGSpecialChars(as.character(target), sub.special=sub.special, xent=TRUE), PACKAGE="RSVGTipsDevice")
+    }
     invisible(NULL)
 }
 
@@ -38,15 +41,15 @@ setSVGShapeToolTip <- function(title=NULL, desc=NULL, desc1=desc, desc2=NULL, su
     toolTipMode <- getSVGToolTipMode()
     if (toolTipMode>0) {
         if (!is.null(title))
-            contents <- c(contents, paste("<title>", encodeSVGSpecialChars(title), "</title>", sep=""))
+            contents <- c(contents, paste("<title>", encodeSVGSpecialChars(title, sub.special=sub.special), "</title>", sep=""))
         if (toolTipMode==1) {
             if (!is.null(desc1))
-                contents <- c(contents, paste("<desc>", encodeSVGSpecialChars(desc1), "</desc>", sep=""))
+                contents <- c(contents, paste("<desc>", encodeSVGSpecialChars(desc1, sub.special=sub.special), "</desc>", sep=""))
         } else {
             if (!is.null(desc1))
-                contents <- c(contents, paste("<desc1>", encodeSVGSpecialChars(desc1), "</desc1>", sep=""))
+                contents <- c(contents, paste("<desc1>", encodeSVGSpecialChars(desc1, sub.special=sub.special), "</desc1>", sep=""))
             if (!is.null(desc2))
-                contents <- c(contents, paste("<desc2>", encodeSVGSpecialChars(desc2), "</desc2>", sep=""))
+                contents <- c(contents, paste("<desc2>", encodeSVGSpecialChars(desc2, sub.special=sub.special), "</desc2>", sep=""))
         }
         if (length(contents)) {
             .C("SetSvgShapeContents", as.character(paste(contents, collapse="\n")), PACKAGE="RSVGTipsDevice")
@@ -55,16 +58,17 @@ setSVGShapeToolTip <- function(title=NULL, desc=NULL, desc1=desc, desc2=NULL, su
     invisible(NULL)
 }
 
-encodeSVGSpecialChars <- function(x, sub.special=TRUE) {
+encodeSVGSpecialChars <- function(x, sub.special=TRUE, xent=FALSE) {
     if (!sub.special)
         return(x)
     if (regexpr("[<>&'\"]", x) > 0) {
-        # use a negative look-ahead assertion to avoid replaceing the "&" in an XML entity
-        x <- gsub("&(?![a-z]+;)", "&amp;", x, perl=TRUE)
-        x <- gsub("<", "&lt;", x, fixed=TRUE)
-        x <- gsub(">", "&gt;", x, fixed=TRUE)
-        x <- gsub("'", "&apos;", x, fixed=TRUE)
-        x <- gsub("\"", "&quot;", x, fixed=TRUE)
+        # use a negative look-ahead assertion to avoid replacing the "&" in an XML entity
+        # XML entities are things like "&amp;" (ampersand) and "&#x3b1;" ('alpha' in Greek font)
+        x <- gsub("&(?!#?[A-Za-z0-9]+;)", if (xent) "&#38;" else "&amp;", x, perl=TRUE)
+        x <- gsub("<", if (xent) "&#60;" else "&lt;", x, fixed=TRUE)
+        x <- gsub(">", if (xent) "&#62;" else "&gt;", x, fixed=TRUE)
+        x <- gsub("'", if (xent) "&#39;" else "&apos;", x, fixed=TRUE)
+        x <- gsub("\"", if (xent) "&#34;" else "&quot;", x, fixed=TRUE)
     }
     x
 }

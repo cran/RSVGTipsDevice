@@ -34,7 +34,7 @@
     This driver currently does not have any font metric information,
     so the use of \code{\link{plotmath}} is not supported.
     \item
-    This device will not successfully record tool tips and hyperlinks if
+    This device will not record tool tips and hyperlinks if
     it is called by \code{dev.copy} - the functions to add tool tips and
     hyperlinks are ignored by other devices.
   }
@@ -45,7 +45,18 @@
     (\code{SVG_footer()} in \code{src/devSVG.c}) - currently the vertical
     spacing (the 'height' and 'y' attributes) is somewhat ad-hoc (coded
     by trial and error, and may not work for all font sizes).
-    \item Add font metric information to support the use of \code{\link{plotmath}}.
+    \item Add font metric information to support the use of
+    \code{\link{plotmath}}.
+    \itemize{
+      \item Note that SVG uses Unicode characters encoded like \code{&\#x3b1;}.
+      The symbols for Unicode are described here:
+      \url{http://www.unicode.org/charts/symbols.html}.
+      \item SVG allows for definitions of fonts - maybe the right
+      approach is to include a symbol font in the doc when plotmath is
+      used.
+      \item \url{http://www.w3.org/TR/SVG11/fonts.html}
+      \item \url{http://www.w3.org/TR/xsl/\#font-model}
+      }
     \item Clean up the two-line tooltip SVG code:
     The two-line tooltip mode displays OK in the default SVG renderers in Firefox (under Windows
     2000/XP and Linux) but does not display in the Batik standalone SVG
@@ -54,6 +65,14 @@
     23.5 Adding private elements and attributes to the DTD.
     \item Provide post-processing to use CSS (cascading style sheets) to make SVG files with
     lots of elements more compact.
+    \item The design of how tooltip and URL information is passed to the
+    device is somewhat ugly -- it would be nicer if the basic graphics
+    commands
+    allowed additional optional arguments.  However, they don't, and
+    the scheme implemented here at least works.  It has the advantage that the
+    graphics commands that specify tooltips and URLs will be ignored
+    when other devices are used.  One disadvantage is graphics recording
+    will not record tooltips and URLs.
   }
 }
 \references{
@@ -72,6 +91,8 @@
   \link[=RSVGTipsDevice]{Overview} of the RSVGTips device.
 
   \code{\link{pictex}}, \code{\link{postscript}}, \code{\link{Devices}}.
-  
+
+  \code{Cairo} is another device for R that can produce SVG
+  graphics; see \url{http://www.rforge.net/Cairo}.  However, it doesn't appear to support tooltips.
 }
 \keyword{device}

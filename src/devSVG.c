@@ -18,21 +18,27 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#define BEGIN_SUSPEND_INTERRUPTS
-#define END_SUSPEND_INTERRUPTS
 #include "R.h"
-#include "Rmath.h"
 #include "Rversion.h"
 
 #include "Rinternals.h"
-#include "Rgraphics.h"
-#include "Rdevices.h"
-#include "R_ext/GraphicsDevice.h"
+#if R_VERSION < R_Version(2,7,0)
+# include "Rgraphics.h"
+# include "Rdevices.h"
+# include "R_ext/GraphicsDevice.h"
+#endif
 #include "R_ext/GraphicsEngine.h"
+#include  <ctype.h> /* for islower */
+
+#ifndef BEGIN_SUSPEND_INTERRUPTS
+# define BEGIN_SUSPEND_INTERRUPTS
+# define END_SUSPEND_INTERRUPTS
+#endif
+
+#if R_VERSION < R_Version(2,6,0)
+# define R_GE_str2col Rf_str2col
+  unsigned int Rf_str2col(const char *);
+#endif
 
 /* device-specific information per SVG device */
 
@@ -76,96 +82,112 @@ typedef struct {
     int toolTipMode; /* 0 = no tooltips; 1 = title + desc; 2 = title + 2 line desc */
     char *shapeContents; /* a string to put inside shapes */
     int shapeContentsUsed;
-    char *shapeURL; /* url to use for a shape */
+    char *shapeURL; /* URL to use for a shape */
     int shapeURLUsed;
+    char *shapeURLTarget; /* URL target to use for a shape */
+    int shapeURLTargetUsed;
     char *title;
 } SVGDesc;
 
 
 /* Global device information */
 
+/*
+ * The charwidth table was constructed by eyeballing results until they
+ * looked good using the plot svgplot11.svg in the examples in
+ * RSVGTipsDevice.Rd.  Unfortunately, SVG seems to have different
+ * string widths on different systems -- these here are tuned to
+ * FireFox running under Ubuntu.  Even FireFox running under Windows
+ * seems to render with different string widths :-(
+ * I don't know why there are 4 vectors of charwidth here -- I made
+ * them all the same.  While all the standard ascii characters seem to
+ * use data from the first vector, some special characters seem to draw
+ * on data from the others.
+ */
 static double charwidth[4][128] = {
     {
-	0.5416690, 0.8333360, 0.7777810, 0.6111145, 0.6666690, 0.7083380, 0.7222240,
-	0.7777810, 0.7222240, 0.7777810, 0.7222240, 0.5833360, 0.5361130, 0.5361130,
-	0.8138910, 0.8138910, 0.2388900, 0.2666680, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.6666700, 0.4444460, 0.4805580, 0.7222240, 0.7777810,
-	0.5000020, 0.8611145, 0.9722260, 0.7777810, 0.2388900, 0.3194460, 0.5000020,
-	0.8333360, 0.5000020, 0.8333360, 0.7583360, 0.2777790, 0.3888900, 0.3888900,
-	0.5000020, 0.7777810, 0.2777790, 0.3333340, 0.2777790, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.2777790, 0.2777790, 0.3194460, 0.7777810, 0.4722240,
-	0.4722240, 0.6666690, 0.6666700, 0.6666700, 0.6388910, 0.7222260, 0.5972240,
-	0.5694475, 0.6666690, 0.7083380, 0.2777810, 0.4722240, 0.6944480, 0.5416690,
-	0.8750050, 0.7083380, 0.7361130, 0.6388910, 0.7361130, 0.6458360, 0.5555570,
-	0.6805570, 0.6875050, 0.6666700, 0.9444480, 0.6666700, 0.6666700, 0.6111130,
-	0.2888900, 0.5000020, 0.2888900, 0.5000020, 0.2777790, 0.2777790, 0.4805570,
-	0.5166680, 0.4444460, 0.5166680, 0.4444460, 0.3055570, 0.5000020, 0.5166680,
-	0.2388900, 0.2666680, 0.4888920, 0.2388900, 0.7944470, 0.5166680, 0.5000020,
-	0.5166680, 0.5166680, 0.3416690, 0.3833340, 0.3611120, 0.5166680, 0.4611130,
-	0.6833360, 0.4611130, 0.4611130, 0.4347230, 0.5000020, 1.0000030, 0.5000020,
-	0.5000020, 0.5000020
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.8064000, 0.5040000, 0.5040000,
+1.0920000, 0.8064000, 1.1928000, 1.0920000, 0.3024000, 0.5040000, 0.5040000,
+0.7056000, 1.0920000, 0.4200000, 0.5040000, 0.4200000, 0.4200000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.4200000, 0.4200000, 1.0920000, 1.0920000, 1.0920000,
+0.7056000, 1.2936000, 0.8904000, 0.8904000, 0.8904000, 0.9912000, 0.7896000,
+0.7056000, 0.9912000, 0.9912000, 0.3024000, 0.3024000, 0.7896000, 0.7056000,
+1.0920000, 0.9912000, 0.9912000, 0.7896000, 0.9912000, 0.7896000, 0.8904000,
+0.7056000, 0.9912000, 0.8904000, 1.0920000, 0.7896000, 0.7056000, 0.9912000,
+0.5040000, 0.4200000, 0.5040000, 1.0920000, 0.7056000, 0.7056000, 0.7896000,
+0.7896000, 0.7056000, 0.7896000, 0.7896000, 0.4200000, 0.7896000, 0.7896000,
+0.3024000, 0.3024000, 0.7056000, 0.3024000, 1.2936000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.5040000, 0.7056000, 0.5040000, 0.7896000, 0.7056000,
+0.8904000, 0.7056000, 0.7056000, 0.7056000, 0.7896000, 0.4200000, 0.7896000,
+1.0920000, 0.7896000
     },
     {
-	0.5805590, 0.9166720, 0.8555600, 0.6722260, 0.7333370, 0.7944490, 0.7944490,
-	0.8555600, 0.7944490, 0.8555600, 0.7944490, 0.6416700, 0.5861150, 0.5861150,
-	0.8916720, 0.8916720, 0.2555570, 0.2861130, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.7333370, 0.4888920, 0.5652800, 0.7944490, 0.8555600,
-	0.5500030, 0.9472275, 1.0694500, 0.8555600, 0.2555570, 0.3666690, 0.5583360,
-	0.9166720, 0.5500030, 1.0291190, 0.8305610, 0.3055570, 0.4277800, 0.4277800,
-	0.5500030, 0.8555600, 0.3055570, 0.3666690, 0.3055570, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.3055570, 0.3055570, 0.3666690, 0.8555600, 0.5194470,
-	0.5194470, 0.7333370, 0.7333370, 0.7333370, 0.7027820, 0.7944490, 0.6416700,
-	0.6111145, 0.7333370, 0.7944490, 0.3305570, 0.5194470, 0.7638930, 0.5805590,
-	0.9777830, 0.7944490, 0.7944490, 0.7027820, 0.7944490, 0.7027820, 0.6111145,
-	0.7333370, 0.7638930, 0.7333370, 1.0388950, 0.7333370, 0.7333370, 0.6722260,
-	0.3430580, 0.5583360, 0.3430580, 0.5500030, 0.3055570, 0.3055570, 0.5250030,
-	0.5611140, 0.4888920, 0.5611140, 0.5111140, 0.3361130, 0.5500030, 0.5611140,
-	0.2555570, 0.2861130, 0.5305590, 0.2555570, 0.8666720, 0.5611140, 0.5500030,
-	0.5611140, 0.5611140, 0.3722250, 0.4216690, 0.4041690, 0.5611140, 0.5000030,
-	0.7444490, 0.5000030, 0.5000030, 0.4763920, 0.5500030, 1.1000060, 0.5500030,
-	0.5500030, 0.550003 },
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.8064000, 0.5040000, 0.5040000,
+1.0920000, 0.8064000, 1.1928000, 1.0920000, 0.3024000, 0.5040000, 0.5040000,
+0.7056000, 1.0920000, 0.4200000, 0.5040000, 0.4200000, 0.4200000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.4200000, 0.4200000, 1.0920000, 1.0920000, 1.0920000,
+0.7056000, 1.2936000, 0.8904000, 0.8904000, 0.8904000, 0.9912000, 0.7896000,
+0.7056000, 0.9912000, 0.9912000, 0.3024000, 0.3024000, 0.7896000, 0.7056000,
+1.0920000, 0.9912000, 0.9912000, 0.7896000, 0.9912000, 0.7896000, 0.8904000,
+0.7056000, 0.9912000, 0.8904000, 1.0920000, 0.7896000, 0.7056000, 0.9912000,
+0.5040000, 0.4200000, 0.5040000, 1.0920000, 0.7056000, 0.7056000, 0.7896000,
+0.7896000, 0.7056000, 0.7896000, 0.7896000, 0.4200000, 0.7896000, 0.7896000,
+0.3024000, 0.3024000, 0.7056000, 0.3024000, 1.2936000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.5040000, 0.7056000, 0.5040000, 0.7896000, 0.7056000,
+0.8904000, 0.7056000, 0.7056000, 0.7056000, 0.7896000, 0.4200000, 0.7896000,
+1.0920000, 0.7896000
+    },
     {
-	0.5416690, 0.8333360, 0.7777810, 0.6111145, 0.6666690, 0.7083380, 0.7222240,
-	0.7777810, 0.7222240, 0.7777810, 0.7222240, 0.5833360, 0.5361130, 0.5361130,
-	0.8138910, 0.8138910, 0.2388900, 0.2666680, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.7375210, 0.4444460, 0.4805580, 0.7222240, 0.7777810,
-	0.5000020, 0.8611145, 0.9722260, 0.7777810, 0.2388900, 0.3194460, 0.5000020,
-	0.8333360, 0.5000020, 0.8333360, 0.7583360, 0.2777790, 0.3888900, 0.3888900,
-	0.5000020, 0.7777810, 0.2777790, 0.3333340, 0.2777790, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.2777790, 0.2777790, 0.3194460, 0.7777810, 0.4722240,
-	0.4722240, 0.6666690, 0.6666700, 0.6666700, 0.6388910, 0.7222260, 0.5972240,
-	0.5694475, 0.6666690, 0.7083380, 0.2777810, 0.4722240, 0.6944480, 0.5416690,
-	0.8750050, 0.7083380, 0.7361130, 0.6388910, 0.7361130, 0.6458360, 0.5555570,
-	0.6805570, 0.6875050, 0.6666700, 0.9444480, 0.6666700, 0.6666700, 0.6111130,
-	0.2888900, 0.5000020, 0.2888900, 0.5000020, 0.2777790, 0.2777790, 0.4805570,
-	0.5166680, 0.4444460, 0.5166680, 0.4444460, 0.3055570, 0.5000020, 0.5166680,
-	0.2388900, 0.2666680, 0.4888920, 0.2388900, 0.7944470, 0.5166680, 0.5000020,
-	0.5166680, 0.5166680, 0.3416690, 0.3833340, 0.3611120, 0.5166680, 0.4611130,
-	0.6833360, 0.4611130, 0.4611130, 0.4347230, 0.5000020, 1.0000030, 0.5000020,
-	0.5000020, 0.5000020 },
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.8064000, 0.5040000, 0.5040000,
+1.0920000, 0.8064000, 1.1928000, 1.0920000, 0.3024000, 0.5040000, 0.5040000,
+0.7056000, 1.0920000, 0.4200000, 0.5040000, 0.4200000, 0.4200000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.4200000, 0.4200000, 1.0920000, 1.0920000, 1.0920000,
+0.7056000, 1.2936000, 0.8904000, 0.8904000, 0.8904000, 0.9912000, 0.7896000,
+0.7056000, 0.9912000, 0.9912000, 0.3024000, 0.3024000, 0.7896000, 0.7056000,
+1.0920000, 0.9912000, 0.9912000, 0.7896000, 0.9912000, 0.7896000, 0.8904000,
+0.7056000, 0.9912000, 0.8904000, 1.0920000, 0.7896000, 0.7056000, 0.9912000,
+0.5040000, 0.4200000, 0.5040000, 1.0920000, 0.7056000, 0.7056000, 0.7896000,
+0.7896000, 0.7056000, 0.7896000, 0.7896000, 0.4200000, 0.7896000, 0.7896000,
+0.3024000, 0.3024000, 0.7056000, 0.3024000, 1.2936000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.5040000, 0.7056000, 0.5040000, 0.7896000, 0.7056000,
+0.8904000, 0.7056000, 0.7056000, 0.7056000, 0.7896000, 0.4200000, 0.7896000,
+1.0920000, 0.7896000
+    },
     {
-	0.5805590, 0.9166720, 0.8555600, 0.6722260, 0.7333370, 0.7944490, 0.7944490,
-	0.8555600, 0.7944490, 0.8555600, 0.7944490, 0.6416700, 0.5861150, 0.5861150,
-	0.8916720, 0.8916720, 0.2555570, 0.2861130, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.8002530, 0.4888920, 0.5652800, 0.7944490, 0.8555600,
-	0.5500030, 0.9472275, 1.0694500, 0.8555600, 0.2555570, 0.3666690, 0.5583360,
-	0.9166720, 0.5500030, 1.0291190, 0.8305610, 0.3055570, 0.4277800, 0.4277800,
-	0.5500030, 0.8555600, 0.3055570, 0.3666690, 0.3055570, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.3055570, 0.3055570, 0.3666690, 0.8555600, 0.5194470,
-	0.5194470, 0.7333370, 0.7333370, 0.7333370, 0.7027820, 0.7944490, 0.6416700,
-	0.6111145, 0.7333370, 0.7944490, 0.3305570, 0.5194470, 0.7638930, 0.5805590,
-	0.9777830, 0.7944490, 0.7944490, 0.7027820, 0.7944490, 0.7027820, 0.6111145,
-	0.7333370, 0.7638930, 0.7333370, 1.0388950, 0.7333370, 0.7333370, 0.6722260,
-	0.3430580, 0.5583360, 0.3430580, 0.5500030, 0.3055570, 0.3055570, 0.5250030,
-	0.5611140, 0.4888920, 0.5611140, 0.5111140, 0.3361130, 0.5500030, 0.5611140,
-	0.2555570, 0.2861130, 0.5305590, 0.2555570, 0.8666720, 0.5611140, 0.5500030,
-	0.5611140, 0.5611140, 0.3722250, 0.4216690, 0.4041690, 0.5611140, 0.5000030,
-	0.7444490, 0.5000030, 0.5000030, 0.4763920, 0.5500030, 1.1000060, 0.5500030,
-	0.5500030, 0.550003
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.8064000, 0.5040000, 0.5040000,
+1.0920000, 0.8064000, 1.1928000, 1.0920000, 0.3024000, 0.5040000, 0.5040000,
+0.7056000, 1.0920000, 0.4200000, 0.5040000, 0.4200000, 0.4200000, 0.7896000,
+0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.4200000, 0.4200000, 1.0920000, 1.0920000, 1.0920000,
+0.7056000, 1.2936000, 0.8904000, 0.8904000, 0.8904000, 0.9912000, 0.7896000,
+0.7056000, 0.9912000, 0.9912000, 0.3024000, 0.3024000, 0.7896000, 0.7056000,
+1.0920000, 0.9912000, 0.9912000, 0.7896000, 0.9912000, 0.7896000, 0.8904000,
+0.7056000, 0.9912000, 0.8904000, 1.0920000, 0.7896000, 0.7056000, 0.9912000,
+0.5040000, 0.4200000, 0.5040000, 1.0920000, 0.7056000, 0.7056000, 0.7896000,
+0.7896000, 0.7056000, 0.7896000, 0.7896000, 0.4200000, 0.7896000, 0.7896000,
+0.3024000, 0.3024000, 0.7056000, 0.3024000, 1.2936000, 0.7896000, 0.7896000,
+0.7896000, 0.7896000, 0.5040000, 0.7056000, 0.5040000, 0.7896000, 0.7056000,
+0.8904000, 0.7056000, 0.7056000, 0.7056000, 0.7896000, 0.4200000, 0.7896000,
+1.0920000, 0.7896000
     }
 };
 
@@ -481,7 +503,6 @@ static void   SVG_Circle(double x, double y, double r,
 static void   SVG_Clip(double, double, double, double, NewDevDesc*);
 static void   SVG_Close(NewDevDesc*);
 static void   SVG_Deactivate(NewDevDesc *);
-static void   SVG_Hold(NewDevDesc*);
 static void   SVG_Line(double x1, double y1, double x2, double y2,
                        R_GE_gcontext *gc,
                        NewDevDesc *dd);
@@ -507,10 +528,10 @@ static void   SVG_Resize(double *left, double *right,
                          double *bottom, double *top,
                          NewDevDesc *dd);
 */
-static double SVG_StrWidth(char *str,
+static double SVG_StrWidth(const char *str,
                            R_GE_gcontext *gc,
                            NewDevDesc *dd);
-static void   SVG_Text(double x, double y, char *str,
+static void   SVG_Text(double x, double y, const char *str,
                        double rot, double hadj,
                        R_GE_gcontext *gc,
                        NewDevDesc *dd);
@@ -584,6 +605,25 @@ void SetSvgShapeURL(char **str)
         return;
     strcpy(ptd->shapeURL, str[0]);
     ptd->shapeURLUsed = 0;
+}
+
+void SetSvgShapeURLTarget(char **str)
+{
+    GEDevDesc *dd = GEcurrentDevice();
+    SVGDesc *ptd;
+    if (dd==0 || dd->dev==0)
+	return;
+    ptd = (SVGDesc *) dd->dev->deviceSpecific;
+    /* this might get called when some other graphics device is being used, */
+    /* in which case we want to do nothing. */
+    if (ptd==0 || ptd->magic!=SVGDescMagic)
+	return;
+    if (ptd->shapeURLTarget!=0)
+	Free(ptd->shapeURLTarget);
+    if (!(ptd->shapeURLTarget = Calloc(strlen(str[0])+1, char)))
+        return;
+    strcpy(ptd->shapeURLTarget, str[0]);
+    ptd->shapeURLTargetUsed = 0;
 }
 
 void GetSvgToolTipMode(int *mode)
@@ -741,11 +781,9 @@ static void SetFont(int face, int size, SVGDesc *ptd)
     /* original code had no units on the font-size, but I found that
      * gave errors in the SVG renderer in FireFox under MS Windows
      */
-    fprintf(ptd->texfp, " style=\"font-size:%dpt\" ",
-	    lsize);
+    fprintf(ptd->texfp, " style=\"font-size:%dpt\" ", lsize);
     ptd->fontsize = lsize;
     ptd->fontface = lface;
-
 }
 
 static void SVG_Activate(NewDevDesc *dd)
@@ -811,7 +849,6 @@ static void SVG_header(SVGDesc *ptd)
 
 static void SVG_footer(SVGDesc *ptd)
 {
-    int i;
     if (ptd->toolTipMode>0) {
 	fprintf(ptd->texfp, "<g id='ToolTip' opacity='%g' visibility='hidden' pointer-events='none'>\n",
 		ptd->tipOpacity);
@@ -916,6 +953,8 @@ static void SVG_Close(NewDevDesc *dd)
 	Free(ptd->shapeContents);
     if (ptd->shapeURL != 0)
 	Free(ptd->shapeURL);
+    if (ptd->shapeURLTarget != 0)
+	Free(ptd->shapeURLTarget);
     if (ptd->title != 0)
 	Free(ptd->title);
     Free(ptd);
@@ -959,13 +998,13 @@ static void SVG_Polyline(int n, double *x, double *y,
 /* String Width in Rasters */
 /* For the current font in pointsize fontsize */
 
-static double SVG_StrWidth(char *str,
+static double SVG_StrWidth(const char *str,
                            R_GE_gcontext *gc,
                            NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
-    char *p;
+    const char *p;
     int size;
     double sum;
     size =  gc->cex * gc->ps + 0.5;
@@ -999,8 +1038,12 @@ static void SVG_Rect(double x0, double y0, double x1, double y1,
 	y1 = tmp;
     }
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
+	fprintf(ptd->texfp, ">\n");
+    }
     fprintf(ptd->texfp,
 	    "<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" ",
 	    x0, y0, x1-x0, y1-y0);
@@ -1017,6 +1060,8 @@ static void SVG_Rect(double x0, double y0, double x1, double y1,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
@@ -1027,8 +1072,12 @@ static void SVG_Circle(double x, double y, double r,
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
+	fprintf(ptd->texfp, ">\n");
+    }
     fprintf(ptd->texfp,
 	    "<circle cx=\"%.2f\" cy=\"%.2f\" r=\"%.2f\" ",
 	    x, y, r*1.5);
@@ -1045,6 +1094,8 @@ static void SVG_Circle(double x, double y, double r,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    ptd->shapeURLTargetUsed = 1;
     }
 
 }
@@ -1058,8 +1109,12 @@ static void SVG_Polygon(int n, double *x, double *y,
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
+	fprintf(ptd->texfp, ">\n");
+    }
 
     fprintf(ptd->texfp, "<polygon points=\"");
 
@@ -1081,23 +1136,40 @@ static void SVG_Polygon(int n, double *x, double *y,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
-static void textext(char *str, SVGDesc *ptd)
+static void textext(const char *str, SVGDesc *ptd)
 {
-    char *c;
+    const char *c;
     for( ; *str ; str++)
         switch(*str) {
 	case '&':
-	    /* check if we have the pattern "&[a-z]+;" which would already be an XML entity */
+	    /* Check if we have the pattern "&#?[A-Za-z0-9]+;" which would already be an XML entity
+	     * XML entities are things like "&amp;" (ampersand) and "&#x3b1;" ('alpha' in Greek font)
+	     * It might be possible to make this test a bit stricter (e.g., only allow numbers or
+	     * upper case if there is a '#' directly after the '&' - look at doing this if it
+	     * seems necessary.
+	     */
 	    c = str+1;
-	    while (*c && islower(*c))
+	    if (*c=='#')
 		c++;
+	    while (*c && isalnum(*c))
+		c++;
+	    /* Now, if *c is a ';' it means we found an XML entity, so in that case
+	     * write the '&' and allow the enclosing for() loop to write the rest.
+	     * If *c is not a ';', it means that *str was an ampersand that needs
+	     * to be encoded as '&amp;', so write that out.
+	     */
 	    if (*c == ';')
 		fputc(*str, ptd->texfp);
 	    else
 		fputs("&amp;", ptd->texfp);
+	    break;
+	case ' ': /* &nbsp; == &#160; */
+	    fputs("&#160;", ptd->texfp);
 	    break;
 	case '<':
 	    fputs("&lt;", ptd->texfp);
@@ -1121,7 +1193,7 @@ static void textext(char *str, SVGDesc *ptd)
 
 /* Rotated Text */
 
-static void SVG_Text(double x, double y, char *str,
+static void SVG_Text(double x, double y, const char *str,
                      double rot, double hadj,
                      R_GE_gcontext *gc,
                      NewDevDesc *dd)
@@ -1132,8 +1204,12 @@ static void SVG_Text(double x, double y, char *str,
 
     size = gc->cex * gc->ps + 0.5;
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
+	fprintf(ptd->texfp, ">\n");
+    }
 
     fprintf(ptd->texfp, "<text transform=\"translate(%.2f,%.2f) ", x, y);
     if (rot != 0)
@@ -1151,6 +1227,8 @@ static void SVG_Text(double x, double y, char *str,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
+	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
+	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
@@ -1162,11 +1240,6 @@ static Rboolean SVG_Locator(double *x, double *y, NewDevDesc *dd)
 
 /* Set Graphics mode - not needed for PS */
 static void SVG_Mode(int mode, NewDevDesc* dd)
-{
-}
-
-/* GraphicsInteraction() for the Mac */
-static void SVG_Hold(NewDevDesc *dd)
 {
 }
 
@@ -1194,19 +1267,15 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     ptd->filename = Calloc(strlen(filename)+1, char);
     strcpy(ptd->filename, filename);
 
-    /* change to R_GE_str2col() for R-2.6.0 - wait a while until after R-2.6.0 is released */
-    dd->startfill = Rf_str2col(bg);
-    dd->startcol = Rf_str2col(fg);
+    dd->startfill = R_GE_str2col(bg);
+    dd->startcol = R_GE_str2col(fg);
     dd->startps = 10;
     dd->startlty = 0;
     dd->startfont = 1;
     dd->startgamma = 1;
 
-    dd->newDevStruct = 1;
-
     dd->activate = SVG_Activate;
     dd->deactivate = SVG_Deactivate;
-    dd->open = SVG_Open;
     dd->close = SVG_Close;
     dd->clip = SVG_Clip;
     dd->size = SVG_Size;
@@ -1220,7 +1289,6 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     dd->polyline = SVG_Polyline;
     dd->locator = SVG_Locator;
     dd->mode = SVG_Mode;
-    dd->hold = SVG_Hold;
     dd->metricInfo = SVG_MetricInfo;
 
     /* Screen Dimensions in Pixels */
@@ -1252,7 +1320,7 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     /* Pure guesswork and eyeballing ... */
 
     dd->xCharOffset =  0; /*0.4900;*/
-    dd->yCharOffset =  0; /*0.3333;*/
+    dd->yCharOffset =  0.5; /*0.3333;*/
     dd->yLineBias = 0; /*0.1;*/
 
     /* Inches per Raster Unit */
@@ -1263,7 +1331,7 @@ Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
     dd->canChangeFont = TRUE;
     dd->canRotateText = TRUE;
     dd->canResizeText = TRUE;
-    dd->canClip = FALSE;
+    dd->canClip = FALSE; /* theoretically, SVG can clip, but we'd probably need to do a lot of work to use it */
     dd->canHAdj = 0;
     dd->canChangeGamma = FALSE;
 
@@ -1302,10 +1370,13 @@ static  GEDevDesc *RSvgDevice(char **file, char **bg, char **fg,
         }
         gsetVar(install(".Device"), mkString("devSVG"), R_NilValue);
         dd = GEcreateDevDesc(dev);
-        dd->newDevStruct = 1;
-        Rf_addDevice((DevDesc*) dd);
-        GEinitDisplayList(dd);
 
+#if R_VERSION < R_Version(2,7,0)
+	Rf_addDevice((DevDesc*) dd);
+#else
+        GEaddDevice(dd);
+#endif
+        GEinitDisplayList(dd);
     } END_SUSPEND_INTERRUPTS;
 
     return(dd);
