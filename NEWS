@@ -1,3 +1,11 @@
+Version 0.7-5: 2008-09-10
+  * Set default font-family to "Arial, sans-serif" for both text in plot
+    and in tooltips
+  * Adjust font widths to be correct for Arial in FireFox under Ubuntu
+    (these will be incorrect if the the font-family is changed.)
+  * Text in a plot now has color and font-family (due to David Reiss)
+  * Default plot size is now 7 x 7 inches
+  * Tweaked nominal char size to make axis labels print OK in simple plots
 Version 0.7-4: 2008-02-17
   * Improve the font width data so that strwidth() is much more accurate.
     (It should be usable now, at least for standard characters in the

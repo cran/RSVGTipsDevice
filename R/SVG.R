@@ -1,4 +1,4 @@
-devSVGTips <- function (file = "Rplots.svg", width = 10, height = 8,
+devSVGTips <- function (file = "Rplots.svg", width = 7, height = 7,
                         bg = "white", fg = "black", onefile = TRUE,
                         xmlHeader = FALSE, useStyleAttributes=FALSE,
                         toolTipMode=1, toolTipFontSize=10, toolTipOpacity=1.0,

@@ -1,5 +1,4 @@
 /*
- *  SVGTips device, (C) 2008 Tony Plate, based on
  *  SVG device, (C) 2002 T Jake Luciani, Based on PicTex device, for
  *  R : A Computer Language for Statistical Data Analysis
  *  Copyright (C) 1995, 1996  Robert Gentleman and Ross Ihaka
@@ -19,32 +18,22 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+#include <ctype.h>
+
+#define BEGIN_SUSPEND_INTERRUPTS
+#define END_SUSPEND_INTERRUPTS
 #include "R.h"
+#include "Rmath.h"
 #include "Rversion.h"
 
 #include "Rinternals.h"
+#include "Rgraphics.h"
+#include "Rdevices.h"
+#include "R_ext/GraphicsDevice.h"
 #include "R_ext/GraphicsEngine.h"
-
-#if R_VERSION < R_Version(2,7,0)
-# include "Rgraphics.h"
-# include "Rdevices.h"
-# include "R_ext/GraphicsDevice.h"
-typedef GEDevDesc* pGEDevDesc;
-typedef NewDevDesc* pDevDesc;
-typedef R_GE_gcontext* pGEcontext;
-#endif
-
-#include  <ctype.h> /* for islower */
-
-#ifndef BEGIN_SUSPEND_INTERRUPTS
-# define BEGIN_SUSPEND_INTERRUPTS
-# define END_SUSPEND_INTERRUPTS
-#endif
-
-#if R_VERSION < R_Version(2,6,0)
-# define R_GE_str2col Rf_str2col
-  unsigned int Rf_str2col(const char *);
-#endif
 
 /* device-specific information per SVG device */
 
@@ -88,10 +77,8 @@ typedef struct {
     int toolTipMode; /* 0 = no tooltips; 1 = title + desc; 2 = title + 2 line desc */
     char *shapeContents; /* a string to put inside shapes */
     int shapeContentsUsed;
-    char *shapeURL; /* URL to use for a shape */
+    char *shapeURL; /* url to use for a shape */
     int shapeURLUsed;
-    char *shapeURLTarget; /* URL target to use for a shape */
-    int shapeURLTargetUsed;
     char *title;
 } SVGDesc;
 
@@ -101,92 +88,10 @@ typedef struct {
 /*
  * The charwidth table was constructed by eyeballing results until they
  * looked good using the plot svgplot11.svg in the examples in
- * RSVGTipsDevice.Rd.  Unfortunately, SVG seems to have different
- * string widths on different systems -- these here are tuned to
- * FireFox running under Ubuntu.  Even FireFox running under Windows
- * seems to render with different string widths :-(
+ * RSVGTipsDevice.Rd.
  * I don't know why there are 4 vectors of charwidth here -- I made
- * them all the same.  While all the standard ascii characters seem to
- * use data from the first vector, some special characters seem to draw
- * on data from the others.
+ * them all the same.
  */
-
-/* This charwidth works for font-family="Arial" in FireFox under Ubuntu */
-
-static double charwidth[4][128] = {
-    {
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.42, 0.42, 0.504, 0.7056, 0.7056, 1.1928, 0.8904, 0.3024,
-0.42, 0.42, 0.504, 0.7896, 0.42, 0.42, 0.42, 0.42,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.42, 0.7896, 0.7896, 0.7896, 0.7056,
-1.3944, 0.8904, 0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912,
-0.9912, 0.42, 0.7056, 0.8904, 0.7056, 1.092, 0.9912, 0.9912,
-0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912, 0.8904, 1.2936,
-0.8904, 0.8904, 0.7896, 0.42, 0.42, 0.42, 0.6048, 0.7056,
-0.42, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.42, 0.7056,
-0.7056, 0.3024, 0.3024, 0.7056, 0.3024, 1.092, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.7056, 0.42, 0.7056, 0.7056, 0.9912,
-0.7056, 0.7056, 0.7056, 0.42, 0.3024, 0.42, 0.7896, 1.2936
-    },{
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.42, 0.42, 0.504, 0.7056, 0.7056, 1.1928, 0.8904, 0.3024,
-0.42, 0.42, 0.504, 0.7896, 0.42, 0.42, 0.42, 0.42,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.42, 0.7896, 0.7896, 0.7896, 0.7056,
-1.3944, 0.8904, 0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912,
-0.9912, 0.42, 0.7056, 0.8904, 0.7056, 1.092, 0.9912, 0.9912,
-0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912, 0.8904, 1.2936,
-0.8904, 0.8904, 0.7896, 0.42, 0.42, 0.42, 0.6048, 0.7056,
-0.42, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.42, 0.7056,
-0.7056, 0.3024, 0.3024, 0.7056, 0.3024, 1.092, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.7056, 0.42, 0.7056, 0.7056, 0.9912,
-0.7056, 0.7056, 0.7056, 0.42, 0.3024, 0.42, 0.7896, 1.2936
-    },{
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.42, 0.42, 0.504, 0.7056, 0.7056, 1.1928, 0.8904, 0.3024,
-0.42, 0.42, 0.504, 0.7896, 0.42, 0.42, 0.42, 0.42,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.42, 0.7896, 0.7896, 0.7896, 0.7056,
-1.3944, 0.8904, 0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912,
-0.9912, 0.42, 0.7056, 0.8904, 0.7056, 1.092, 0.9912, 0.9912,
-0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912, 0.8904, 1.2936,
-0.8904, 0.8904, 0.7896, 0.42, 0.42, 0.42, 0.6048, 0.7056,
-0.42, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.42, 0.7056,
-0.7056, 0.3024, 0.3024, 0.7056, 0.3024, 1.092, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.7056, 0.42, 0.7056, 0.7056, 0.9912,
-0.7056, 0.7056, 0.7056, 0.42, 0.3024, 0.42, 0.7896, 1.2936
-    },{
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.42, 0.42, 0.504, 0.7056, 0.7056, 1.1928, 0.8904, 0.3024,
-0.42, 0.42, 0.504, 0.7896, 0.42, 0.42, 0.42, 0.42,
-0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.42, 0.7896, 0.7896, 0.7896, 0.7056,
-1.3944, 0.8904, 0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912,
-0.9912, 0.42, 0.7056, 0.8904, 0.7056, 1.092, 0.9912, 0.9912,
-0.8904, 0.9912, 0.9912, 0.8904, 0.7896, 0.9912, 0.8904, 1.2936,
-0.8904, 0.8904, 0.7896, 0.42, 0.42, 0.42, 0.6048, 0.7056,
-0.42, 0.7056, 0.7056, 0.7056, 0.7056, 0.7056, 0.42, 0.7056,
-0.7056, 0.3024, 0.3024, 0.7056, 0.3024, 1.092, 0.7056, 0.7056,
-0.7056, 0.7056, 0.42, 0.7056, 0.42, 0.7056, 0.7056, 0.9912,
-0.7056, 0.7056, 0.7056, 0.42, 0.3024, 0.42, 0.7896, 1.2936
-    }
-};
-
-/* This charwidth works for font-family="sans-serif" in FireFox under Ubuntu */
-/*
 static double charwidth[4][128] = {
     {
 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000, 0.7896000,
@@ -273,95 +178,6 @@ static double charwidth[4][128] = {
 1.0920000, 0.7896000
     }
 };
-*/
-
-/*************
- * charwidth table from RSvgDevice
-static double charwidth[4][128] = {
-    {
-	0.5416690, 0.8333360, 0.7777810, 0.6111145, 0.6666690, 0.7083380, 0.7222240,
-	0.7777810, 0.7222240, 0.7777810, 0.7222240, 0.5833360, 0.5361130, 0.5361130,
-	0.8138910, 0.8138910, 0.2388900, 0.2666680, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.6666700, 0.4444460, 0.4805580, 0.7222240, 0.7777810,
-	0.5000020, 0.8611145, 0.9722260, 0.7777810, 0.2388900, 0.3194460, 0.5000020,
-	0.8333360, 0.5000020, 0.8333360, 0.7583360, 0.2777790, 0.3888900, 0.3888900,
-	0.5000020, 0.7777810, 0.2777790, 0.3333340, 0.2777790, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.2777790, 0.2777790, 0.3194460, 0.7777810, 0.4722240,
-	0.4722240, 0.6666690, 0.6666700, 0.6666700, 0.6388910, 0.7222260, 0.5972240,
-	0.5694475, 0.6666690, 0.7083380, 0.2777810, 0.4722240, 0.6944480, 0.5416690,
-	0.8750050, 0.7083380, 0.7361130, 0.6388910, 0.7361130, 0.6458360, 0.5555570,
-	0.6805570, 0.6875050, 0.6666700, 0.9444480, 0.6666700, 0.6666700, 0.6111130,
-	0.2888900, 0.5000020, 0.2888900, 0.5000020, 0.2777790, 0.2777790, 0.4805570,
-	0.5166680, 0.4444460, 0.5166680, 0.4444460, 0.3055570, 0.5000020, 0.5166680,
-	0.2388900, 0.2666680, 0.4888920, 0.2388900, 0.7944470, 0.5166680, 0.5000020,
-	0.5166680, 0.5166680, 0.3416690, 0.3833340, 0.3611120, 0.5166680, 0.4611130,
-	0.6833360, 0.4611130, 0.4611130, 0.4347230, 0.5000020, 1.0000030, 0.5000020,
-	0.5000020, 0.5000020
-    },
-    {
-	0.5805590, 0.9166720, 0.8555600, 0.6722260, 0.7333370, 0.7944490, 0.7944490,
-	0.8555600, 0.7944490, 0.8555600, 0.7944490, 0.6416700, 0.5861150, 0.5861150,
-	0.8916720, 0.8916720, 0.2555570, 0.2861130, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.7333370, 0.4888920, 0.5652800, 0.7944490, 0.8555600,
-	0.5500030, 0.9472275, 1.0694500, 0.8555600, 0.2555570, 0.3666690, 0.5583360,
-	0.9166720, 0.5500030, 1.0291190, 0.8305610, 0.3055570, 0.4277800, 0.4277800,
-	0.5500030, 0.8555600, 0.3055570, 0.3666690, 0.3055570, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.3055570, 0.3055570, 0.3666690, 0.8555600, 0.5194470,
-	0.5194470, 0.7333370, 0.7333370, 0.7333370, 0.7027820, 0.7944490, 0.6416700,
-	0.6111145, 0.7333370, 0.7944490, 0.3305570, 0.5194470, 0.7638930, 0.5805590,
-	0.9777830, 0.7944490, 0.7944490, 0.7027820, 0.7944490, 0.7027820, 0.6111145,
-	0.7333370, 0.7638930, 0.7333370, 1.0388950, 0.7333370, 0.7333370, 0.6722260,
-	0.3430580, 0.5583360, 0.3430580, 0.5500030, 0.3055570, 0.3055570, 0.5250030,
-	0.5611140, 0.4888920, 0.5611140, 0.5111140, 0.3361130, 0.5500030, 0.5611140,
-	0.2555570, 0.2861130, 0.5305590, 0.2555570, 0.8666720, 0.5611140, 0.5500030,
-	0.5611140, 0.5611140, 0.3722250, 0.4216690, 0.4041690, 0.5611140, 0.5000030,
-	0.7444490, 0.5000030, 0.5000030, 0.4763920, 0.5500030, 1.1000060, 0.5500030,
-	0.5500030, 0.550003 },
-    {
-	0.5416690, 0.8333360, 0.7777810, 0.6111145, 0.6666690, 0.7083380, 0.7222240,
-	0.7777810, 0.7222240, 0.7777810, 0.7222240, 0.5833360, 0.5361130, 0.5361130,
-	0.8138910, 0.8138910, 0.2388900, 0.2666680, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.7375210, 0.4444460, 0.4805580, 0.7222240, 0.7777810,
-	0.5000020, 0.8611145, 0.9722260, 0.7777810, 0.2388900, 0.3194460, 0.5000020,
-	0.8333360, 0.5000020, 0.8333360, 0.7583360, 0.2777790, 0.3888900, 0.3888900,
-	0.5000020, 0.7777810, 0.2777790, 0.3333340, 0.2777790, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020, 0.5000020,
-	0.5000020, 0.5000020, 0.2777790, 0.2777790, 0.3194460, 0.7777810, 0.4722240,
-	0.4722240, 0.6666690, 0.6666700, 0.6666700, 0.6388910, 0.7222260, 0.5972240,
-	0.5694475, 0.6666690, 0.7083380, 0.2777810, 0.4722240, 0.6944480, 0.5416690,
-	0.8750050, 0.7083380, 0.7361130, 0.6388910, 0.7361130, 0.6458360, 0.5555570,
-	0.6805570, 0.6875050, 0.6666700, 0.9444480, 0.6666700, 0.6666700, 0.6111130,
-	0.2888900, 0.5000020, 0.2888900, 0.5000020, 0.2777790, 0.2777790, 0.4805570,
-	0.5166680, 0.4444460, 0.5166680, 0.4444460, 0.3055570, 0.5000020, 0.5166680,
-	0.2388900, 0.2666680, 0.4888920, 0.2388900, 0.7944470, 0.5166680, 0.5000020,
-	0.5166680, 0.5166680, 0.3416690, 0.3833340, 0.3611120, 0.5166680, 0.4611130,
-	0.6833360, 0.4611130, 0.4611130, 0.4347230, 0.5000020, 1.0000030, 0.5000020,
-	0.5000020, 0.5000020 },
-    {
-	0.5805590, 0.9166720, 0.8555600, 0.6722260, 0.7333370, 0.7944490, 0.7944490,
-	0.8555600, 0.7944490, 0.8555600, 0.7944490, 0.6416700, 0.5861150, 0.5861150,
-	0.8916720, 0.8916720, 0.2555570, 0.2861130, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.8002530, 0.4888920, 0.5652800, 0.7944490, 0.8555600,
-	0.5500030, 0.9472275, 1.0694500, 0.8555600, 0.2555570, 0.3666690, 0.5583360,
-	0.9166720, 0.5500030, 1.0291190, 0.8305610, 0.3055570, 0.4277800, 0.4277800,
-	0.5500030, 0.8555600, 0.3055570, 0.3666690, 0.3055570, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030, 0.5500030,
-	0.5500030, 0.5500030, 0.3055570, 0.3055570, 0.3666690, 0.8555600, 0.5194470,
-	0.5194470, 0.7333370, 0.7333370, 0.7333370, 0.7027820, 0.7944490, 0.6416700,
-	0.6111145, 0.7333370, 0.7944490, 0.3305570, 0.5194470, 0.7638930, 0.5805590,
-	0.9777830, 0.7944490, 0.7944490, 0.7027820, 0.7944490, 0.7027820, 0.6111145,
-	0.7333370, 0.7638930, 0.7333370, 1.0388950, 0.7333370, 0.7333370, 0.6722260,
-	0.3430580, 0.5583360, 0.3430580, 0.5500030, 0.3055570, 0.3055570, 0.5250030,
-	0.5611140, 0.4888920, 0.5611140, 0.5111140, 0.3361130, 0.5500030, 0.5611140,
-	0.2555570, 0.2861130, 0.5305590, 0.2555570, 0.8666720, 0.5611140, 0.5500030,
-	0.5611140, 0.5611140, 0.3722250, 0.4216690, 0.4041690, 0.5611140, 0.5000030,
-	0.7444490, 0.5000030, 0.5000030, 0.4763920, 0.5500030, 1.1000060, 0.5500030,
-	0.5500030, 0.550003
-    }
-};
-****************/
 
 static char* toolTip1Header[] = {
     "<script type=\"text/ecmascript\"><![CDATA[",
@@ -391,7 +207,6 @@ static char* toolTip1Header[] = {
     "       toolTip = SVGDocument.getElementById('ToolTip');",
     "       tipBox = SVGDocument.getElementById('tipbox');",
     "       tipText = SVGDocument.getElementById('tipText');",
-    "       tipText.setAttributeNS(null, 'font-family', 'Arial, sans-serif' );",
     "       tipTitle = SVGDocument.getElementById('tipTitle');",
     "       tipDesc = SVGDocument.getElementById('tipDesc');",
     "       //window.status = (TrueCoords);",
@@ -539,7 +354,6 @@ static char* toolTip2Header[] = {
     "      toolTip = SVGDocument.getElementById('ToolTip');",
     "      tipBox = SVGDocument.getElementById('tipbox');",
     "      tipText = SVGDocument.getElementById('tipText');",
-    "      tipText.setAttributeNS(null, 'font-family', 'Arial, sans-serif' );",
     "      tipTitle = SVGDocument.getElementById('tipTitle');",
     "      tipDesc1 = SVGDocument.getElementById('tipDesc1');",
     "      tipDesc2 = SVGDocument.getElementById('tipDesc2');",
@@ -670,49 +484,50 @@ static char* toolTip2Header[] = {
 
 /* Device driver actions */
 
-static void   SVG_Activate(pDevDesc dd);
+static void   SVG_Activate(NewDevDesc *);
 static void   SVG_Circle(double x, double y, double r,
-                         const pGEcontext gc,
-                         pDevDesc dd);
-static void   SVG_Clip(double, double, double, double, pDevDesc);
-static void   SVG_Close(pDevDesc);
-static void   SVG_Deactivate(pDevDesc );
+                         R_GE_gcontext *gc,
+                         NewDevDesc *dd);
+static void   SVG_Clip(double, double, double, double, NewDevDesc*);
+static void   SVG_Close(NewDevDesc*);
+static void   SVG_Deactivate(NewDevDesc *);
+static void   SVG_Hold(NewDevDesc*);
 static void   SVG_Line(double x1, double y1, double x2, double y2,
-                       const pGEcontext gc,
-                       pDevDesc dd);
-static Rboolean SVG_Locator(double*, double*, pDevDesc);
-static void   SVG_Mode(int, pDevDesc);
-static void   SVG_NewPage(const pGEcontext gc, pDevDesc dd);
-static Rboolean SVG_Open(pDevDesc, SVGDesc*);
+                       R_GE_gcontext *gc,
+                       NewDevDesc *dd);
+static Rboolean SVG_Locator(double*, double*, NewDevDesc*);
+static void   SVG_Mode(int, NewDevDesc*);
+static void   SVG_NewPage(R_GE_gcontext *gc, NewDevDesc *dd);
+static Rboolean SVG_Open(NewDevDesc*, SVGDesc*);
 static void   SVG_Polygon(int n, double *x, double *y,
-                          const pGEcontext gc,
-                          pDevDesc dd);
+                          R_GE_gcontext *gc,
+                          NewDevDesc *dd);
 static void   SVG_Polyline(int n, double *x, double *y,
-                           const pGEcontext gc,
-                           pDevDesc dd);
+                           R_GE_gcontext *gc,
+                           NewDevDesc *dd);
 static void   SVG_Rect(double x0, double y0, double x1, double y1,
-                       const pGEcontext gc,
-                       pDevDesc dd);
+                       R_GE_gcontext *gc,
+                       NewDevDesc *dd);
 static void   SVG_Size(double *left, double *right,
                        double *bottom, double *top,
-                       pDevDesc dd);
+                       NewDevDesc *dd);
 
 /*
 static void   SVG_Resize(double *left, double *right,
                          double *bottom, double *top,
-                         pDevDesc dd);
+                         NewDevDesc *dd);
 */
-static double SVG_StrWidth(const char *str,
-                           const pGEcontext gc,
-                           pDevDesc dd);
-static void   SVG_Text(double x, double y, const char *str,
+static double SVG_StrWidth(char *str,
+                           R_GE_gcontext *gc,
+                           NewDevDesc *dd);
+static void   SVG_Text(double x, double y, char *str,
                        double rot, double hadj,
-                       const pGEcontext gc,
-                       pDevDesc dd);
+                       R_GE_gcontext *gc,
+                       NewDevDesc *dd);
 static void   SVG_MetricInfo(int c,
-                             const pGEcontext gc,
+                             R_GE_gcontext *gc,
                              double* ascent, double* descent,
-                             double* width, pDevDesc dd);
+                             double* width, NewDevDesc *dd);
 
 /* Support routines */
 
@@ -735,7 +550,7 @@ char *col2RGBname(unsigned int col)
 /*Thanks Paul*/
 static void SVG_Size(double *left, double *right,
                      double *bottom, double *top,
-                     pDevDesc dd)
+                     NewDevDesc *dd)
 {
     *left = dd->left;
     *right = dd->right;
@@ -745,7 +560,7 @@ static void SVG_Size(double *left, double *right,
 
 void SetSvgShapeContents(char **str)
 {
-    pGEDevDesc dd = GEcurrentDevice();
+    GEDevDesc *dd = GEcurrentDevice();
     SVGDesc *ptd;
     if (dd==0 || dd->dev==0)
 	return;
@@ -764,7 +579,7 @@ void SetSvgShapeContents(char **str)
 
 void SetSvgShapeURL(char **str)
 {
-    pGEDevDesc dd = GEcurrentDevice();
+    GEDevDesc *dd = GEcurrentDevice();
     SVGDesc *ptd;
     if (dd==0 || dd->dev==0)
 	return;
@@ -781,28 +596,9 @@ void SetSvgShapeURL(char **str)
     ptd->shapeURLUsed = 0;
 }
 
-void SetSvgShapeURLTarget(char **str)
-{
-    GEDevDesc *dd = GEcurrentDevice();
-    SVGDesc *ptd;
-    if (dd==0 || dd->dev==0)
-	return;
-    ptd = (SVGDesc *) dd->dev->deviceSpecific;
-    /* this might get called when some other graphics device is being used, */
-    /* in which case we want to do nothing. */
-    if (ptd==0 || ptd->magic!=SVGDescMagic)
-	return;
-    if (ptd->shapeURLTarget!=0)
-	Free(ptd->shapeURLTarget);
-    if (!(ptd->shapeURLTarget = Calloc(strlen(str[0])+1, char)))
-        return;
-    strcpy(ptd->shapeURLTarget, str[0]);
-    ptd->shapeURLTargetUsed = 0;
-}
-
 void GetSvgToolTipMode(int *mode)
 {
-    pGEDevDesc dd = GEcurrentDevice();
+    GEDevDesc *dd = GEcurrentDevice();
     SVGDesc *ptd;
     /* this might get called when some other graphics device is being used, */
     /* in which case we want to return mode = -1 */
@@ -818,7 +614,7 @@ void GetSvgToolTipMode(int *mode)
 /*Get Device point from user point*/
 /*void GetSvgDevicePoint(double x, double y)
   {
-  pGEDevDesc dd = GEcurrentDevice();
+  GEDevDesc *dd = GEcurrentDevice();
 
   x = toDeviceX(x,
   GConvert(x, y, GE_NDC, GE_DEVICE, dd);
@@ -837,7 +633,7 @@ void GetSvgToolTipMode(int *mode)
   {
   int i;
 
-  pGEDevDesc dd = GEcurrentDevice();
+  GEDevDesc *dd = GEcurrentDevice();
 
   for(i = 0; i < *n; i++){
   GConvert(x+i, y+i, GE_NDC, DEVICE, dd);
@@ -854,7 +650,7 @@ void GetSvgToolTipMode(int *mode)
   *h = in2dots(ptd->height);
   }
 */
-static void SetLinetype(int newlty, int newlwd, pDevDesc dd, int
+static void SetLinetype(int newlty, int newlwd, NewDevDesc *dd, int
                         fgcol, int col)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
@@ -952,22 +748,26 @@ static void SetFont(int face, int size, SVGDesc *ptd)
     if (lface < 1 || lface > 4) lface = 1;
     if (lsize < 1 || lsize > 24) lsize = 10;
 
+    /* original code had no units on the font-size, but I found that
+     * gave errors in the SVG renderer in FireFox under MS Windows
+     */
+    fprintf(ptd->texfp, " style=\"font-size:%dpt\" ", lsize);
     ptd->fontsize = lsize;
     ptd->fontface = lface;
 }
 
-static void SVG_Activate(pDevDesc dd)
+static void SVG_Activate(NewDevDesc *dd)
 {
 }
 
-static void SVG_Deactivate(pDevDesc dd)
+static void SVG_Deactivate(NewDevDesc *dd)
 {
 }
 
 static void SVG_MetricInfo(int c,
-                           const pGEcontext gc,
+                           R_GE_gcontext *gc,
                            double* ascent, double* descent,
-                           double* width, pDevDesc dd)
+                           double* width, NewDevDesc *dd)
 {
     /* metric information not available => return 0,0,0 */
     *ascent  = 0.0;
@@ -994,7 +794,6 @@ static void SVG_header(SVGDesc *ptd)
 	    in2dots(ptd->width), in2dots(ptd->height));
     fprintf(ptd->texfp, "     viewBox=\"0,0,%.2f,%.2f\"\n",
 	    in2dots(ptd->width), in2dots(ptd->height));
-    fprintf(ptd->texfp, "     font-family=\"Arial, Helvetica, sans-serif\"\n");
     if (ptd->toolTipMode)
 	fprintf(ptd->texfp, "     onload='Init(evt)'\n");
 
@@ -1045,7 +844,7 @@ static void SVG_footer(SVGDesc *ptd)
 
 /* Initialize the device */
 
-static Rboolean SVG_Open(pDevDesc dd, SVGDesc *ptd)
+static Rboolean SVG_Open(NewDevDesc *dd, SVGDesc *ptd)
 {
     ptd->fontsize = 0;
     ptd->fontface = 0;
@@ -1073,14 +872,14 @@ static Rboolean SVG_Open(pDevDesc dd, SVGDesc *ptd)
 /*
 static void SVG_Resize(double *left, double *right,
                        double *bottom, double *top,
-                       pDevDesc dd)
+                       NewDevDesc *dd)
 {
 
 }
 */
 
 static void SVG_Clip(double x0, double x1, double y0, double y1,
-                     pDevDesc dd)
+                     NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
@@ -1092,7 +891,7 @@ static void SVG_Clip(double x0, double x1, double y0, double y1,
 
 /* Start a new page */
 
-static void SVG_NewPage(const pGEcontext gc, pDevDesc dd)
+static void SVG_NewPage(R_GE_gcontext *gc, NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
     int face, size;
@@ -1107,12 +906,12 @@ static void SVG_NewPage(const pGEcontext gc, pDevDesc dd)
     size = ptd->fontsize;
     ptd->fontface = 0;
     ptd->fontsize = 0;
-    SetFont(gc->fontface, size, ptd);
+    /*SetFont(face, size, ptd);*/
 }
 
 /* Close down the driver */
 
-static void SVG_Close(pDevDesc dd)
+static void SVG_Close(NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
@@ -1124,8 +923,6 @@ static void SVG_Close(pDevDesc dd)
 	Free(ptd->shapeContents);
     if (ptd->shapeURL != 0)
 	Free(ptd->shapeURL);
-    if (ptd->shapeURLTarget != 0)
-	Free(ptd->shapeURLTarget);
     if (ptd->title != 0)
 	Free(ptd->title);
     Free(ptd);
@@ -1133,8 +930,8 @@ static void SVG_Close(pDevDesc dd)
 
 
 static void SVG_Line(double x1, double y1, double x2, double y2,
-                     const pGEcontext gc,
-                     pDevDesc dd)
+                     R_GE_gcontext *gc,
+                     NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
@@ -1149,8 +946,8 @@ static void SVG_Line(double x1, double y1, double x2, double y2,
 }
 
 static void SVG_Polyline(int n, double *x, double *y,
-                         const pGEcontext gc,
-                         pDevDesc dd)
+                         R_GE_gcontext *gc,
+                         NewDevDesc *dd)
 {
     int i;
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
@@ -1169,17 +966,17 @@ static void SVG_Polyline(int n, double *x, double *y,
 /* String Width in Rasters */
 /* For the current font in pointsize fontsize */
 
-static double SVG_StrWidth(const char *str,
-                           const pGEcontext gc,
-                           pDevDesc dd)
+static double SVG_StrWidth(char *str,
+                           R_GE_gcontext *gc,
+                           NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
-    const char *p;
+    char *p;
     int size;
     double sum;
     size =  gc->cex * gc->ps + 0.5;
-    SetFont(gc->fontface, size, ptd);
+    /*SetFont(font, size, ptd);*/
     sum = 0;
     for(p=str ; *p ; p++)
 	sum += charwidth[ptd->fontface][(int)*p];
@@ -1190,8 +987,8 @@ static double SVG_StrWidth(const char *str,
 
 /* Possibly Filled Rectangle */
 static void SVG_Rect(double x0, double y0, double x1, double y1,
-                     const pGEcontext gc,
-                     pDevDesc dd)
+                     R_GE_gcontext *gc,
+                     NewDevDesc *dd)
 {
     double tmp;
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
@@ -1209,12 +1006,8 @@ static void SVG_Rect(double x0, double y0, double x1, double y1,
 	y1 = tmp;
     }
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
-	fprintf(ptd->texfp, ">\n");
-    }
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
     fprintf(ptd->texfp,
 	    "<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" ",
 	    x0, y0, x1-x0, y1-y0);
@@ -1231,24 +1024,18 @@ static void SVG_Rect(double x0, double y0, double x1, double y1,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
 static void SVG_Circle(double x, double y, double r,
-                       const pGEcontext gc,
-                       pDevDesc dd)
+                       R_GE_gcontext *gc,
+                       NewDevDesc *dd)
 {
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
-	fprintf(ptd->texfp, ">\n");
-    }
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
     fprintf(ptd->texfp,
 	    "<circle cx=\"%.2f\" cy=\"%.2f\" r=\"%.2f\" ",
 	    x, y, r*1.5);
@@ -1265,27 +1052,21 @@ static void SVG_Circle(double x, double y, double r,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    ptd->shapeURLTargetUsed = 1;
     }
 
 }
 
 static void SVG_Polygon(int n, double *x, double *y,
-                        const pGEcontext gc,
-                        pDevDesc dd)
+                        R_GE_gcontext *gc,
+                        NewDevDesc *dd)
 {
     int i;
 
     SVGDesc *ptd = (SVGDesc *) dd->deviceSpecific;
 
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
-	fprintf(ptd->texfp, ">\n");
-    }
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
 
     fprintf(ptd->texfp, "<polygon points=\"");
 
@@ -1307,14 +1088,12 @@ static void SVG_Polygon(int n, double *x, double *y,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
-static void textext(const char *str, SVGDesc *ptd)
+static void textext(char *str, SVGDesc *ptd)
 {
-    const char *c;
+    char *c;
     for( ; *str ; str++)
         switch(*str) {
 	case '&':
@@ -1364,10 +1143,10 @@ static void textext(const char *str, SVGDesc *ptd)
 
 /* Rotated Text */
 
-static void SVG_Text(double x, double y, const char *str,
+static void SVG_Text(double x, double y, char *str,
                      double rot, double hadj,
-                     const pGEcontext gc,
-                     pDevDesc dd)
+                     R_GE_gcontext *gc,
+                     NewDevDesc *dd)
 {
     int size;
 
@@ -1375,12 +1154,8 @@ static void SVG_Text(double x, double y, const char *str,
 
     size = gc->cex * gc->ps + 0.5;
 
-    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
-	fprintf(ptd->texfp, "<a xlink:href=\"%s\"\n", ptd->shapeURL);
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    fprintf(ptd->texfp, " target=\"%s\"", ptd->shapeURLTarget);
-	fprintf(ptd->texfp, ">\n");
-    }
+    if (ptd->shapeURL != 0 && !ptd->shapeURLUsed)
+	fprintf(ptd->texfp, "<a xlink:href=\"%s\">\n", ptd->shapeURL);
 
     fprintf(ptd->texfp, "<text transform=\"translate(%.2f,%.2f) ", x, y);
     if (rot != 0)
@@ -1388,15 +1163,7 @@ static void SVG_Text(double x, double y, const char *str,
     else
 	fprintf(ptd->texfp, "\" ");
 
-    if (gc->fontfamily && strlen(gc->fontfamily))
-	fprintf(ptd->texfp, "font-family=\"%s\" ", gc->fontfamily);
-    fprintf(ptd->texfp, "fill=\"%s\" ", col2RGBname(gc->col));
-
     SetFont(gc->fontface, size, ptd);
-    /* original code had no units on the font-size, but I found that
-     * gave errors in the SVG renderer in FireFox under MS Windows
-     */
-    fprintf(ptd->texfp, " style=\"font-size:%dpt\" ", ptd->fontsize);
 
     fprintf(ptd->texfp, ">");
 
@@ -1406,23 +1173,26 @@ static void SVG_Text(double x, double y, const char *str,
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
 	ptd->shapeURLUsed = 1;
-	if (ptd->shapeURLTarget != 0 && !ptd->shapeURLTargetUsed)
-	    ptd->shapeURLTargetUsed = 1;
     }
 }
 
 /* Pick */
-static Rboolean SVG_Locator(double *x, double *y, pDevDesc dd)
+static Rboolean SVG_Locator(double *x, double *y, NewDevDesc *dd)
 {
     return FALSE;
 }
 
 /* Set Graphics mode - not needed for PS */
-static void SVG_Mode(int mode, pDevDesc dd)
+static void SVG_Mode(int mode, NewDevDesc* dd)
 {
 }
 
-Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
+/* GraphicsInteraction() for the Mac */
+static void SVG_Hold(NewDevDesc *dd)
+{
+}
+
+Rboolean SVGDeviceDriver(NewDevDesc *dd, char *filename, char *bg, char *fg,
                          double width, double height, Rboolean debug,
                          Rboolean xmlHeader, char *title, int toolTipMode,
 			 int tipFontSize, double tipOpacity,
@@ -1446,6 +1216,7 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
     ptd->filename = Calloc(strlen(filename)+1, char);
     strcpy(ptd->filename, filename);
 
+    /* changed from Rf_str2col() to R_GE_str2col() for R-2.6.0 */
     dd->startfill = R_GE_str2col(bg);
     dd->startcol = R_GE_str2col(fg);
     dd->startps = 10;
@@ -1453,8 +1224,11 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
     dd->startfont = 1;
     dd->startgamma = 1;
 
+    dd->newDevStruct = 1;
+
     dd->activate = SVG_Activate;
     dd->deactivate = SVG_Deactivate;
+    dd->open = SVG_Open;
     dd->close = SVG_Close;
     dd->clip = SVG_Clip;
     dd->size = SVG_Size;
@@ -1468,6 +1242,7 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
     dd->polyline = SVG_Polyline;
     dd->locator = SVG_Locator;
     dd->mode = SVG_Mode;
+    dd->hold = SVG_Hold;
     dd->metricInfo = SVG_MetricInfo;
 
     /* Screen Dimensions in Pixels */
@@ -1489,10 +1264,9 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
 
     /* Base Pointsize */
     /* Nominal Character Sizes in Pixels */
-    /* cra[1] tuned to get margins OK in svgplot4 in RSVGTipsDevice/man/RSVGTipsDevice.Rd 
-     * after setting default font to Arial */
+
     dd->cra[0] =         (6.0/12.0) * 10.0;
-    dd->cra[1] =        (13.0/12.0) * 10.0;
+    dd->cra[1] =        (10.0/12.0) * 10.0;
 
     /* Character Addressing Offsets */
     /* These offsets should center a single */
@@ -1507,7 +1281,11 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
     /* We use printer points, i.e. 72.27 dots per inch : */
     dd->ipr[0] = dd->ipr[1] = 1./DOTSperIN;
 
-    dd->canClip = FALSE;
+    dd->canResizePlot = FALSE;
+    dd->canChangeFont = TRUE;
+    dd->canRotateText = TRUE;
+    dd->canResizeText = TRUE;
+    dd->canClip = FALSE; /* theoretically, SVG can clip, but we'd probably need to do a lot of work to use it */
     dd->canHAdj = 0;
     dd->canChangeGamma = FALSE;
 
@@ -1520,37 +1298,36 @@ Rboolean SVGDeviceDriver(pDevDesc dd, char *filename, char *bg, char *fg,
     return TRUE;
 }
 
-static  pGEDevDesc RSvgDevice(char **file, char **bg, char **fg,
+static  GEDevDesc *RSvgDevice(char **file, char **bg, char **fg,
                               double *width, double *height, int *debug,
                               int *xmlHeader, char **title, int *toolTipMode,
 			      int *tipFontSize, double *tipOpacity,
 			      int *onefile, int *useStyleAttributes)
 {
-    pGEDevDesc dd;
-    pDevDesc dev;
+    GEDevDesc *dd;
+    NewDevDesc *dev;
 
     if (debug[0] == NA_LOGICAL) debug = FALSE;
 
-    R_GE_checkVersionOrDie(R_GE_version);
     R_CheckDeviceAvailable();
     BEGIN_SUSPEND_INTERRUPTS {
         if (!(dev = Calloc(1, NewDevDesc)))
             error("unable to allocate memory for NewDevDesc (small)");
+        /* Do this for early redraw attempts */
+        dev->displayList = R_NilValue;
+
         if (!SVGDeviceDriver(dev, file[0], bg[0], fg[0], width[0], height[0], debug[0],
 			     xmlHeader[0], title[0], toolTipMode[0], tipFontSize[0],
 			     tipOpacity[0], onefile[0], useStyleAttributes[0])) {
             Free(dev);
             error("unable to start device SVG");
         }
-        dd = GEcreateDevDesc(dev);
-
-#if R_VERSION < R_Version(2,7,0)
         gsetVar(install(".Device"), mkString("devSVG"), R_NilValue);
-	Rf_addDevice((DevDesc*) dd);
-#else
-        GEaddDevice2(dd, "devSVG");
-#endif
+        dd = GEcreateDevDesc(dev);
+        dd->newDevStruct = 1;
+        Rf_addDevice((DevDesc*) dd);
         GEinitDisplayList(dd);
+
     } END_SUSPEND_INTERRUPTS;
 
     return(dd);
