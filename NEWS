@@ -1,3 +1,6 @@
+Version 1.0: 2008-10-12
+  * Removed reference to type NewDevDesc in src/devSVG.c, which is disappearing in R.2.8.0
+  * Tool tips can now be added to text (due to Charles Berry)
 Version 0.7-5: 2008-09-10
   * Set default font-family to "Arial, sans-serif" for both text in plot
     and in tooltips

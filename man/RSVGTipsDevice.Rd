@@ -18,9 +18,9 @@
   \itemize{
     \item{\code{\link{devSVGTips}}}{Open an SVG device}
     \item{\code{\link{setSVGShapeToolTip}}}{Set a tool tip to be used
-      for the next graphics shape drawn}
+      for the next graphics shape or text drawn}
     \item{\code{\link{setSVGShapeURL}}}{Set a URL to be used
-      in the hyperlink for the next graphics shape drawn}
+      in the hyperlink for the next graphics shape or text drawn}
     \item{\code{\link{getSVGToolTipMode}}}{Get the tool tip mode used by
       the current graphics device}
     }
@@ -37,6 +37,7 @@
 }
 \examples{
 library("RSVGTipsDevice")
+sessionInfo()
 devSVGTips("svgplot1.svg", toolTipMode=1,
     title="SVG example plot 1: shapes and points, tooltips are title + 1 line")
 plot(c(0,10),c(0,10), type="n", xlab="x", ylab="y",
@@ -53,6 +54,8 @@ points(2:8, 8:2, cex=3, pch=19, col='black')
 invisible(sapply(1:7, function(x)
 {setSVGShapeToolTip(title=paste("point", x))
  points(x+1, 8-x, cex=3, pch=1, col='black')}))
+setSVGShapeToolTip(title="Text", desc="can have a tool tip too!")
+text(x=4, y=9.5, lab="Poke me!", col="blue")
 dev.off()
 
 devSVGTips("svgplot2.svg", toolTipMode=2,

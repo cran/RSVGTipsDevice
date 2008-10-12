@@ -34,6 +34,10 @@ typedef NewDevDesc* pDevDesc;
 typedef R_GE_gcontext* pGEcontext;
 #endif
 
+#if R_VERSION < R_Version(2,8,0)
+typedef NewDevDesc DevDesc;
+#endif
+
 #include  <ctype.h> /* for islower */
 
 #ifndef BEGIN_SUSPEND_INTERRUPTS
@@ -1402,6 +1406,11 @@ static void SVG_Text(double x, double y, const char *str,
 
     textext(str, ptd);
 
+    if (ptd->shapeContents != 0 && ! ptd->shapeContentsUsed) {
+	fprintf(ptd->texfp, "%s\n", ptd->shapeContents);
+	ptd->shapeContentsUsed = 1;
+    }
+
     fprintf(ptd->texfp, "</text>\n");
     if (ptd->shapeURL != 0 && !ptd->shapeURLUsed) {
 	fprintf(ptd->texfp, "</a>\n");
@@ -1534,8 +1543,8 @@ static  pGEDevDesc RSvgDevice(char **file, char **bg, char **fg,
     R_GE_checkVersionOrDie(R_GE_version);
     R_CheckDeviceAvailable();
     BEGIN_SUSPEND_INTERRUPTS {
-        if (!(dev = Calloc(1, NewDevDesc)))
-            error("unable to allocate memory for NewDevDesc (small)");
+        if (!(dev = Calloc(1, DevDesc)))
+            error("unable to allocate memory for DevDesc (small)");
         if (!SVGDeviceDriver(dev, file[0], bg[0], fg[0], width[0], height[0], debug[0],
 			     xmlHeader[0], title[0], toolTipMode[0], tipFontSize[0],
 			     tipOpacity[0], onefile[0], useStyleAttributes[0])) {

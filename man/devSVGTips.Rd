@@ -32,7 +32,7 @@ devSVGTips(file = "Rplots.svg", width = 7, height = 7,
 }
 \description{
   This function starts up an SVG graphics device that will write to a
-  file.  The SVG shapes have optional tooltips and/or
+  file.  The SVG shapes and text have optional tooltips and/or
   hyperlinks.
 }
 \details{
@@ -75,6 +75,7 @@ devSVGTips(file = "Rplots.svg", width = 7, height = 7,
   \code{\link{setSVGShapeToolTip}}, \code{\link{setSVGShapeURL}}, \code{\link{getSVGToolTipMode}}, \code{\link{pictex}}, \code{\link{postscript}}, \code{\link{Devices}}.
 }
 \examples{
+\dontrun{
 library("RSVGTipsDevice")
 devSVGTips("svgplot1.svg", toolTipMode=1, title="SVG example plot 1: shapes and points, tooltips are title + 1 line")
 plot(c(0,10),c(0,10), type="n", xlab="x", ylab="y", main="Example SVG plot with title+ 1 line tips (mode=1)")
@@ -88,9 +89,10 @@ polygon(c(3,6,8), c(3,6,3), col='green')
 points(2:8, 8:2, cex=3, pch=19, col='black')
 # tooltips on each these points
 invisible(sapply(1:7, function(x) {setSVGShapeToolTip(title=paste("point", x)); points(x+1, 8-x, cex=3, pch=1, col='black')}))
+setSVGShapeToolTip(title="Text", desc="can have a tool tip too!")
+text(x=4, y=9, lab="Poke me!", col="blue")
 dev.off()
 
-\dontrun{
 # Not run in tests because uses the SemiPar package for the fuel.frame data
 # A plot of fuel mileage vs weight
 library("RSVGTipsDevice")
